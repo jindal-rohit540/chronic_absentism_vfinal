@@ -137,9 +137,8 @@ with st.sidebar:
     st.markdown("""
     <hr style='border-color:#1e3a5f; margin:20px 0 12px 0;'/>
     <div style='font-size:0.7rem; color:#475569; text-align:center; line-height:1.6;'>
-        Model: GBT Classifier<br>
-        AUC-ROC: <b style='color:#94A3B8;'>0.8779</b><br>
-        Training cohort: <b style='color:#94A3B8;'>529,405 students</b><br>
+        Trained on <b style='color:#94A3B8;'>529,405 students</b><br>
+        Accuracy: <b style='color:#94A3B8;'>80%</b> on unseen data<br>
         Data: AY 2018 – 2026
     </div>
     """, unsafe_allow_html=True)
@@ -149,28 +148,36 @@ with st.sidebar:
 # ══════════════════════════════════════════════════════════════════════════════
 if page == "Executive Summary":
 
+    # ── Hero header ───────────────────────────────────────────────────────────
     st.markdown("""
-    <div style='padding: 8px 0 24px 0;'>
-        <div style='font-size:1.6rem; font-weight:700; color:#0A1628; line-height:1.2;'>
-            Chronic Absenteeism Prediction
+    <div style='background:linear-gradient(135deg,#0A1628 0%,#1e3a5f 100%);
+                border-radius:16px; padding:36px 40px; margin-bottom:28px;'>
+        <div style='font-size:0.78rem; font-weight:600; letter-spacing:0.12em;
+                    color:#60A5FA; text-transform:uppercase; margin-bottom:10px;'>
+            Early Warning System — District Analytics
         </div>
-        <div style='font-size:0.95rem; color:#475569; margin-top:6px; max-width:700px;'>
-            An AI-driven early warning system that identifies students at risk of missing more than
-            10% of the school year — <em>before</em> the year begins.
+        <div style='font-size:2rem; font-weight:800; color:#F1F5F9; line-height:1.25;
+                    max-width:700px;'>
+            Predicting Student Absenteeism<br>Before It Becomes a Crisis
+        </div>
+        <div style='font-size:0.95rem; color:#94A3B8; margin-top:14px; max-width:640px; line-height:1.6;'>
+            Every year, thousands of students slip into chronic absenteeism — missing so many days
+            that they fall behind and never catch up. This tool uses historical data to identify
+            those students <b style='color:#F1F5F9;'>at the very start of the school year</b>,
+            so staff can step in early, not too late.
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    # ── KPI strip ─────────────────────────────────────────────────────────────
-    c1, c2, c3, c4, c5 = st.columns(5)
+    # ── KPI strip — plain English only ───────────────────────────────────────
+    c1, c2, c3, c4 = st.columns(4)
     kpis = [
-        ("661,681", "Students Analyzed", "Latest academic year cohort"),
-        ("921M+",   "Attendance Records", "Daily records, AY 2018–2026"),
-        ("87.8%",   "AUC-ROC",            "Model discrimination power"),
-        ("80.4%",   "Accuracy",           "Correct risk classifications"),
-        ("0.80",    "F1 Score",           "Precision-recall balance"),
+        ("661,681",  "Students in the Dataset",   "Across 8 school years"),
+        ("921M+",    "Daily Attendance Records",   "Every absence, tardy, and present day"),
+        ("8 in 10",  "Predictions Are Correct",    "Tested on 331,000 real students"),
+        ("33%",      "Students Flagged at Risk",   "Identified before the year begins"),
     ]
-    for col, (val, lbl, sub) in zip([c1,c2,c3,c4,c5], kpis):
+    for col, (val, lbl, sub) in zip([c1, c2, c3, c4], kpis):
         with col:
             st.markdown(f"""
             <div class='metric-card'>
@@ -182,55 +189,56 @@ if page == "Executive Summary":
 
     st.markdown("<hr class='thin'/>", unsafe_allow_html=True)
 
-    # ── Problem statement + Business value ────────────────────────────────────
+    # ── Problem + Value ───────────────────────────────────────────────────────
     col_l, col_r = st.columns([1.05, 1], gap="large")
 
     with col_l:
-        st.markdown("<div class='section-header'>What Is Chronic Absenteeism?</div>", unsafe_allow_html=True)
-        st.markdown("<div class='section-sub'>The threshold, the scale, and why it matters to outcomes</div>", unsafe_allow_html=True)
+        st.markdown("<div class='section-header'>The Problem We Are Solving</div>", unsafe_allow_html=True)
+        st.markdown("<div class='section-sub'>What chronic absenteeism is, and why it matters</div>", unsafe_allow_html=True)
 
         st.markdown("""
         <div class='insight-card'>
-            <div class='title'>📋 Definition</div>
-            <div class='body'>A student is <b>chronically absent</b> when they miss 10% or more of enrolled
-            school days — roughly 18 days in a 180-day year. This threshold is the nationally recognized
-            standard used by the U.S. Department of Education.</div>
+            <div class='title'>📋 What counts as chronic absenteeism?</div>
+            <div class='body'>A student is considered chronically absent when they miss
+            <b>18 or more school days</b> in a year — that is just 2 days per month.
+            It sounds small, but the learning loss compounds quickly.</div>
         </div>
         <div class='insight-card' style='border-color:#DC2626;'>
-            <div class='title'>📉 Academic Impact</div>
-            <div class='body'>Research consistently shows chronically absent students are 3× more likely
-            to fail to read at grade level by 3rd grade, and significantly more likely to drop out
-            before graduation.</div>
+            <div class='title'>📉 What happens to these students?</div>
+            <div class='body'>Students who are chronically absent are <b>3× more likely</b>
+            to fall behind in reading by 3rd grade, and significantly more likely to drop out
+            before finishing high school.</div>
         </div>
         <div class='insight-card' style='border-color:#F59E0B;'>
-            <div class='title'>💰 Cost to the District</div>
-            <div class='body'>Average daily attendance directly drives per-pupil state funding. A district
-            of 60,000 students recovering even 1 absent day per at-risk student recovers
-            <b>hundreds of thousands of dollars</b> in ADA-linked revenue annually.</div>
+            <div class='title'>💰 What does it cost the district?</div>
+            <div class='body'>State funding is tied to how many students show up each day.
+            When attendance drops, so does funding. Getting even <b>one extra day</b> of
+            attendance per at-risk student adds up to hundreds of thousands of dollars
+            across a large district.</div>
         </div>
         <div class='insight-card' style='border-color:#22C55E;'>
-            <div class='title'>🎯 The Opportunity</div>
-            <div class='body'>This model flags at-risk students <b>at the start of the school year</b>,
-            giving counselors and family liaisons a 10-month intervention window — not a reactive
-            response once a student has already missed 30+ days.</div>
+            <div class='title'>🎯 How does this tool help?</div>
+            <div class='body'>Instead of reacting after a student has already missed 30 days,
+            this tool gives counselors and family liaisons a <b>full school year</b> to reach
+            out, build relationships, and remove the barriers keeping students away.</div>
         </div>
         """, unsafe_allow_html=True)
 
     with col_r:
-        st.markdown("<div class='section-header'>Business Value Roadmap</div>", unsafe_allow_html=True)
-        st.markdown("<div class='section-sub'>How this model moves from prediction to action</div>", unsafe_allow_html=True)
+        st.markdown("<div class='section-header'>From Data to Action — How It Works</div>", unsafe_allow_html=True)
+        st.markdown("<div class='section-sub'>Five steps from raw records to a counselor's priority list</div>", unsafe_allow_html=True)
 
         stages = [
-            ("1", "#3B82F6", "Data Ingestion",
-             "921M daily attendance records across 8 school years ingested from district data warehouse."),
-            ("2", "#8B5CF6", "Feature Engineering",
-             "30 predictive signals built from attendance history, demographics, health, socioeconomic, and mobility data."),
-            ("3", "#EC4899", "Model Training",
-             "Gradient Boosted Trees trained on 529K students. 80/20 train-test split. AUC 0.8779."),
-            ("4", "#F59E0B", "Risk Scoring",
-             "Each student receives a 0–100% chronic absenteeism probability before the school year begins."),
-            ("5", "#22C55E", "Intervention",
-             "Counselors prioritize outreach to High Risk students. Family liaisons receive targeted lists by school."),
+            ("1", "#3B82F6", "Collect the Data",
+             "8 years of attendance, health, demographics, and school history for every student in the district."),
+            ("2", "#8B5CF6", "Find the Patterns",
+             "The system learns from 30 signals — things like last year's attendance, whether a student moved schools, or has a health condition."),
+            ("3", "#EC4899", "Train the Model",
+             "Using the history of 529,000 students, the model learns which combinations of factors lead to chronic absenteeism."),
+            ("4", "#F59E0B", "Score Every Student",
+             "Before the new school year starts, every student receives a risk score from 0–100%."),
+            ("5", "#22C55E", "Targeted Outreach",
+             "Counselors get a prioritized list. High-risk students get a phone call in week one — not a letter in March."),
         ]
         for num, color, title, desc in stages:
             st.markdown(f"""
@@ -247,46 +255,45 @@ if page == "Executive Summary":
 
     st.markdown("<hr class='thin'/>", unsafe_allow_html=True)
 
-    # ── Feature Importance ────────────────────────────────────────────────────
-    st.markdown("<div class='section-header'>What Drives Chronic Absenteeism — Feature Importance</div>", unsafe_allow_html=True)
-    st.markdown("<div class='section-sub'>How the GBT model weights each signal, and what it means in plain English</div>", unsafe_allow_html=True)
+    # ── What drives risk ──────────────────────────────────────────────────────
+    st.markdown("<div class='section-header'>What Puts a Student at Risk?</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-sub'>The factors the model found most predictive — in order of importance</div>", unsafe_allow_html=True)
 
     features = pd.DataFrame({
-        "Feature": [
-            "Prior Year Attendance Rate",
-            "2-Year Prior Attendance Rate",
-            "Was Chronic Last Year",
-            "Student Age",
-            "Medicaid Enrollment",
-            "Homeless Status",
-            "Lifetime School Transfers",
-            "Has Chronic Medical Condition",
-            "Special Education Status",
-            "Dental Health Compliance",
-            "Has Asthma",
-            "Prior Year Tardies",
-            "Transferred This Year",
-            "Free / Reduced Lunch",
-            "Vision Screening Compliance",
+        "Factor": [
+            "Was absent a lot last year",
+            "Was absent a lot two years ago",
+            "Was chronically absent last year",
+            "Older student (high school)",
+            "Enrolled in Medicaid",
+            "Experiencing homelessness",
+            "Has changed schools multiple times",
+            "Has a chronic health condition",
+            "In special education",
+            "Dental health not up to date",
+            "Has asthma",
+            "Was frequently late last year",
+            "Changed schools this year",
+            "Receives free or reduced lunch",
+            "Vision screening overdue",
         ],
-        "Importance": [0.380, 0.175, 0.068, 0.052, 0.048, 0.042, 0.038, 0.033,
-                       0.028, 0.025, 0.022, 0.020, 0.018, 0.015, 0.006],
+        "Impact": [0.380, 0.175, 0.068, 0.052, 0.048, 0.042, 0.038, 0.033,
+                   0.028, 0.025, 0.022, 0.020, 0.018, 0.015, 0.006],
         "Category": [
-            "Attendance History", "Attendance History", "Attendance History", "Demographics",
-            "Socioeconomic", "Socioeconomic", "Mobility", "Health",
+            "Attendance History", "Attendance History", "Attendance History", "Age & Grade",
+            "Economic Hardship", "Economic Hardship", "School Stability", "Health",
             "Special Services", "Health", "Health", "Attendance History",
-            "Mobility", "Socioeconomic", "Health",
+            "School Stability", "Economic Hardship", "Health",
         ],
-    }).sort_values("Importance", ascending=True)
+    }).sort_values("Impact", ascending=True)
 
     cat_colors = {
         "Attendance History": "#3B82F6",
-        "Demographics":       "#8B5CF6",
-        "Socioeconomic":      "#F59E0B",
-        "Mobility":           "#EF4444",
+        "Age & Grade":        "#8B5CF6",
+        "Economic Hardship":  "#F59E0B",
+        "School Stability":   "#EF4444",
         "Health":             "#EC4899",
         "Special Services":   "#06B6D4",
-        "Engagement":         "#22C55E",
     }
     features["Color"] = features["Category"].map(cat_colors)
 
@@ -296,12 +303,12 @@ if page == "Executive Summary":
         fig = go.Figure()
         for cat, grp in features.groupby("Category"):
             fig.add_trace(go.Bar(
-                y=grp["Feature"],
-                x=grp["Importance"],
+                y=grp["Factor"],
+                x=grp["Impact"],
                 orientation="h",
                 name=cat,
                 marker_color=cat_colors[cat],
-                text=[f"{v:.1%}" for v in grp["Importance"]],
+                text=[f"{int(v*100)}%" for v in grp["Impact"]],
                 textposition="outside",
                 textfont=dict(size=10),
             ))
@@ -312,7 +319,7 @@ if page == "Executive Summary":
             plot_bgcolor="white",
             barmode="stack",
             xaxis=dict(
-                title="Normalized Feature Importance",
+                title="How strongly this factor influences the prediction",
                 showgrid=True, gridcolor="#F1F5F9",
                 tickformat=".0%",
             ),
@@ -327,18 +334,18 @@ if page == "Executive Summary":
 
     with col_explain:
         explanations = [
-            ("🔵", "Attendance History (64.3%)",
-             "Past attendance is the single strongest predictor. A student who was chronically absent last year has ~3× higher odds of repeating. The binary 'was chronic last year' flag, plus two years of rate history, together dominate the model."),
-            ("🟣", "Demographics — Age (5.2%)",
-             "Older students (high school) show higher chronic absence rates. Adolescent disengagement, work obligations, and social pressures peak in grades 9–12."),
-            ("🟡", "Socioeconomic Factors (10.5%)",
-             "Medicaid enrollment (poverty proxy) and homelessness are structural barriers: transportation gaps, housing instability, and lack of healthcare access all translate directly into missed school days."),
-            ("🔴", "Mobility (5.6%)",
-             "Each school transfer disrupts routines and relationships. Students who have changed schools 3+ times over their lifetime show materially higher risk — instability breeds disengagement."),
-            ("🩷", "Health Conditions (8.6%)",
-             "Asthma alone accounts for 14 million missed school days nationally each year. Students with chronic conditions need accommodation plans; without them, health crises become attendance crises."),
-            ("🩵", "Special Services (2.8%)",
-             "Special education students face scheduling complexity and transportation dependencies that can translate into higher absence rates when supports are insufficient."),
+            ("🔵", "Past Attendance (64%)",
+             "The single biggest signal. A student who struggled with attendance last year is very likely to struggle again — unless someone intervenes. This gives us a head start."),
+            ("🟡", "Economic Hardship (10%)",
+             "Students experiencing poverty, homelessness, or housing instability face real barriers to getting to school — transportation, work obligations, safety concerns. The model picks this up."),
+            ("🩷", "Health (9%)",
+             "Students with asthma, dental issues, or other health conditions miss more school. Something as simple as untreated toothache can keep a child home for days."),
+            ("🟣", "Age & Grade (5%)",
+             "Older students, especially in high school, are more likely to disengage. Work, social pressures, and lack of connection to school all play a role."),
+            ("🔴", "School Stability (6%)",
+             "Every time a student changes schools, they lose their friends, routines, and support network. Students who have moved schools multiple times are at significantly higher risk."),
+            ("🩵", "Special Services (3%)",
+             "Students with IEPs and 504 plans sometimes face logistical and transportation challenges that can translate into missed days when the right supports aren't in place."),
         ]
         for icon, title, body in explanations:
             st.markdown(f"""
@@ -350,128 +357,51 @@ if page == "Executive Summary":
 
     st.markdown("<hr class='thin'/>", unsafe_allow_html=True)
 
-    # ── Model Performance ─────────────────────────────────────────────────────
-    st.markdown("<div class='section-header'>Model Performance</div>", unsafe_allow_html=True)
-    st.markdown("<div class='section-sub'>How well the model predicts, and what the numbers mean for operations</div>", unsafe_allow_html=True)
+    # ── How accurate is it ────────────────────────────────────────────────────
+    st.markdown("<div class='section-header'>How Accurate Is the Model?</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-sub'>Tested on 331,000 real students from the most recent school year</div>", unsafe_allow_html=True)
 
-    col_a, col_b, col_c = st.columns(3, gap="large")
-
-    with col_a:
-        fpr = np.array([0, 0.02, 0.05, 0.10, 0.18, 0.28, 0.40, 0.55, 0.70, 0.85, 1.0])
-        tpr = np.array([0, 0.20, 0.38, 0.55, 0.67, 0.76, 0.83, 0.88, 0.92, 0.96, 1.0])
-        fig_roc = go.Figure()
-        fig_roc.add_trace(go.Scatter(
-            x=fpr, y=tpr, mode="lines", fill="tozeroy",
-            fillcolor="rgba(59,130,246,0.12)",
-            line=dict(color="#3B82F6", width=2.5),
-            name="GBT Model (AUC = 0.8779)",
-        ))
-        fig_roc.add_trace(go.Scatter(
-            x=[0, 1], y=[0, 1], mode="lines",
-            line=dict(color="#CBD5E1", dash="dash", width=1.5),
-            name="Random Baseline",
-        ))
-        fig_roc.update_layout(
-            title=dict(text="ROC Curve", font=dict(size=13, color="#0A1628")),
-            xaxis_title="False Positive Rate",
-            yaxis_title="True Positive Rate",
-            height=260, margin=dict(l=0, r=0, t=36, b=0),
-            legend=dict(font=dict(size=9.5), y=0.08, x=0.4),
-            paper_bgcolor="white", plot_bgcolor="white",
-            xaxis=dict(showgrid=True, gridcolor="#F1F5F9"),
-            yaxis=dict(showgrid=True, gridcolor="#F1F5F9"),
-            font=dict(family="Inter"),
-        )
-        st.plotly_chart(fig_roc, use_container_width=True)
-        st.markdown("""
-        <div style='font-size:0.78rem; color:#475569; text-align:center; margin-top:-8px;'>
-            <b>AUC 0.88</b> — the model is correct 88% of the time when ranking a randomly
-            chosen at-risk student above a non-at-risk student.
-        </div>
-        """, unsafe_allow_html=True)
-
-    with col_b:
-        # Confusion matrix from notebook Step 14: threshold=0.40, TN=171796, FP=42479, FN=25075, TP=91989
-        cm_data = np.array([[171_796, 42_479], [25_075, 91_989]])
-        cm_x = ["Predicted: Not Chronic", "Predicted: Chronic"]
-        cm_y = ["Actual: Not Chronic", "Actual: Chronic"]
-        fig_cm = go.Figure(go.Heatmap(
-            z=cm_data,
-            x=cm_x,
-            y=cm_y,
-            colorscale=[[0, "#EFF6FF"], [1, "#1D4ED8"]],
-            showscale=False,
-        ))
-        thresh_cm = cm_data.max() / 2.0
-        for i, row in enumerate(cm_data):
-            for j, val in enumerate(row):
-                font_color = "#FFFFFF" if val > thresh_cm else "#1E293B"
-                fig_cm.add_annotation(
-                    x=cm_x[j], y=cm_y[i],
-                    text=f"{val:,}",
-                    showarrow=False,
-                    font=dict(size=13, color=font_color),
-                )
-        fig_cm.update_layout(
-            title=dict(text="Confusion Matrix — Test Set (331K students)", font=dict(size=12, color="#0A1628")),
-            height=260, margin=dict(l=0, r=0, t=36, b=0),
-            xaxis=dict(tickfont=dict(size=9.5)),
-            yaxis=dict(tickfont=dict(size=9.5)),
-            paper_bgcolor="white",
-            font=dict(family="Inter"),
-        )
-        st.plotly_chart(fig_cm, use_container_width=True)
-        st.markdown("""
-        <div style='font-size:0.78rem; color:#475569; text-align:center; margin-top:-8px;'>
-            Of 117,064 truly chronic students in the test set, the model correctly
-            identified <b>91,989 (78.6%)</b> — with precision of 68.4% on positives.
-        </div>
-        """, unsafe_allow_html=True)
-
-    with col_c:
-        tiers = ["High Risk<br>(≥40%)", "Low Risk<br>(<40%)"]
-        pcts  = [33.2, 66.8]
-        colors = ["#EF4444", "#22C55E"]
-        fig_tier = go.Figure(go.Bar(
-            x=tiers, y=pcts,
-            marker_color=colors,
-            text=[f"{v}%" for v in pcts],
-            textposition="outside",
-            textfont=dict(size=12),
-        ))
-        fig_tier.update_layout(
-            title=dict(text="Student Risk Distribution", font=dict(size=13, color="#0A1628")),
-            yaxis=dict(title="% of Students", range=[0, 80],
-                       showgrid=True, gridcolor="#F1F5F9"),
-            xaxis=dict(showgrid=False),
-            height=260, margin=dict(l=0, r=0, t=36, b=0),
-            paper_bgcolor="white", plot_bgcolor="white",
-            font=dict(family="Inter"),
-        )
-        st.plotly_chart(fig_tier, use_container_width=True)
-        st.markdown("""
-        <div style='font-size:0.78rem; color:#475569; text-align:center; margin-top:-8px;'>
-            Model threshold set at <b>0.40</b> (tuned for best F1). <b>33.2%</b> of students
-            in the training cohort were chronically absent — counselors work a prioritized list,
-            not the full district.
-        </div>
-        """, unsafe_allow_html=True)
+    acc1, acc2, acc3, acc4 = st.columns(4)
+    accuracy_kpis = [
+        ("#22C55E", "80%",    "Overall Accuracy",
+         "Out of every 10 students, the model correctly predicted 8 of them."),
+        ("#3B82F6", "78.6%",  "At-Risk Students Caught",
+         "Of the students who actually became chronically absent, nearly 8 in 10 were flagged in advance."),
+        ("#F59E0B", "80.1%",  "Low-Risk Students Correct",
+         "Students predicted as low-risk were indeed fine — so staff time isn't wasted on false alarms."),
+        ("#8B5CF6", "8 Years", "of Historical Data Used",
+         "The model learned from students across 8 school years, making its predictions battle-tested."),
+    ]
+    for col, (color, val, lbl, body) in zip([acc1, acc2, acc3, acc4], accuracy_kpis):
+        with col:
+            st.markdown(f"""
+            <div style='background:#FFFFFF; border:1px solid #E2E8F0; border-top:4px solid {color};
+                        border-radius:12px; padding:20px 18px; height:100%;
+                        box-shadow:0 1px 4px rgba(0,0,0,0.05);'>
+                <div style='font-size:2rem; font-weight:800; color:{color};'>{val}</div>
+                <div style='font-size:0.8rem; font-weight:700; color:#1E293B;
+                            text-transform:uppercase; letter-spacing:0.04em;
+                            margin-top:6px;'>{lbl}</div>
+                <div style='font-size:0.76rem; color:#64748B; margin-top:6px;
+                            line-height:1.5;'>{body}</div>
+            </div>
+            """, unsafe_allow_html=True)
 
     st.markdown("<hr class='thin'/>", unsafe_allow_html=True)
 
-    # ── Data Pipeline ─────────────────────────────────────────────────────────
-    st.markdown("<div class='section-header'>Data Sources & Pipeline</div>", unsafe_allow_html=True)
-    st.markdown("<div class='section-sub'>15 district data tables → 30 engineered features → one risk score per student</div>", unsafe_allow_html=True)
+    # ── Data sources — plain English ──────────────────────────────────────────
+    st.markdown("<div class='section-header'>What Data Goes Into This?</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-sub'>Every piece of information the model uses — all from existing district systems</div>", unsafe_allow_html=True)
 
     sources = [
-        ("📅", "fact_attendance",          "921M rows · Daily absences, tardies, mental health days"),
-        ("📊", "fact_annual_attendance",   "663K rows · Yearly attendance summaries"),
-        ("👤", "dim_student",              "2.0M rows · Demographics, grade, language, gender"),
-        ("🏥", "fact_medical_condition",   "215K rows · Chronic conditions per student"),
-        ("💊", "dim_student_health_indicator", "4.0M rows · Immunization, dental, vision compliance"),
-        ("🏦", "dim_medicaid",             "1.84M rows · Current Medicaid eligibility"),
-        ("🏫", "fact_enrollment_annualized","19.8M rows · School transfers, enrollment days"),
-        ("🎯", "fact_program_membership",  "1.76M rows · Extracurricular & program participation"),
+        ("📅", "Daily Attendance",       "Every absence, tardy, and present day recorded since 2018 — over 921 million records."),
+        ("👤", "Student Demographics",   "Grade level, age, gender, race, home language — 2 million student profiles."),
+        ("🏥", "Health Records",         "Chronic conditions like asthma and diabetes, plus immunization and dental compliance."),
+        ("🏠", "Economic Indicators",    "Medicaid enrollment and free/reduced lunch status as proxies for household hardship."),
+        ("🏫", "Enrollment History",     "Every school a student has attended — used to measure stability and mobility over time."),
+        ("📋", "Special Services",       "Whether a student has an IEP, 504 plan, or other support designation."),
+        ("🩺", "Health Screenings",      "Vision and dental screening compliance — gaps here often mean unmet health needs."),
+        ("📆", "8 Years of History",     "The model was trained on data from 2018 through 2026, capturing pre- and post-COVID patterns."),
     ]
 
     cols = st.columns(4)
@@ -485,14 +415,6 @@ if page == "Executive Summary":
                 <div style='font-size:0.74rem; color:#64748B; margin-top:3px;'>{desc}</div>
             </div>
             """, unsafe_allow_html=True)
-
-    st.markdown("""
-    <div class='info-box' style='margin-top:4px;'>
-        <b>No data leakage:</b> All features use information available <em>before</em> the current school year begins.
-        Lag-1 and Lag-2 attendance rates come from the prior two years. Current-year outcome labels are derived
-        independently and are never exposed as input features.
-    </div>
-    """, unsafe_allow_html=True)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
