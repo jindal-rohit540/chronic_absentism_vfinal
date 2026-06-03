@@ -571,21 +571,25 @@ else:
             "Grade 11":     "11",
             "Grade 12":     "12",
         }
-        # School / Network
+        # School / Network — loaded from dim_schools.csv
+        @st.cache_data
+        def load_schools():
+            df = pd.read_csv("Built-in/dim_schools.csv")
+            df["NETWORK"] = df["NETWORK"].fillna("No Network")
+            return df
+
+        df_schools = load_schools()
+        networks = sorted(df_schools["NETWORK"].unique().tolist())
+
         st.markdown("<div class='section-header'>School & Network</div>", unsafe_allow_html=True)
         sn1, sn2 = st.columns(2)
-        NETWORK_OPTIONS = [
-            "Network 1", "Network 2", "Network 3", "Network 4", "Network 5",
-            "Network 6", "Network 7", "Network 8", "Network 9", "Network 10",
-            "Charter / Contract", "Not Assigned",
-        ]
         with sn1:
-            network = st.selectbox("Network", NETWORK_OPTIONS,
+            network = st.selectbox("Network", networks,
                                    help="The network or cluster this school belongs to")
         with sn2:
-            school_name = st.text_input("School Name", value="",
-                                        placeholder="e.g. Lincoln Elementary",
-                                        help="Used for context only — the model scores by student profile, not school identity")
+            school_list = df_schools[df_schools["NETWORK"] == network]["SCHOOL_NAME"].sort_values().tolist()
+            school_name = st.selectbox("School", school_list,
+                                       help="Used for context only — the model scores by student profile, not school identity")
 
         st.markdown("<hr class='thin'/>", unsafe_allow_html=True)
 
