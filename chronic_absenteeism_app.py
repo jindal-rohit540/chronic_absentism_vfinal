@@ -2,8 +2,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
-import plotly.express as px
-import math
 import joblib
 
 st.set_page_config(
@@ -292,7 +290,7 @@ if page == "Executive Summary":
         "Age & Grade":        "#8B5CF6",
         "Economic Hardship":  "#F59E0B",
         "Student Mobility":   "#EF4444",
-        "Student Health":             "#EC4899",
+        "Student Health":  "#EC4899",
         "Special Services":   "#06B6D4",
     }
     features["Color"] = features["Category"].map(cat_colors)
@@ -529,7 +527,7 @@ else:
     <div class='info-box'>
         📌 <b>How to use:</b> Fill in what you know. Unknown values default to district averages.
         The model produces a probability that this student will miss ≥10% of school days this year.
-        Risk threshold is set at <b>40%</b> (tuned for best F1 on the 2026 test cohort).
+        A score of <b>40% or above</b> is flagged as at-risk.
     </div>
     """, unsafe_allow_html=True)
 
@@ -720,6 +718,7 @@ else:
             "immun_compliant":       1,
             "health_exam_compliant": 1,
             "covid_year":            0,
+            "student_age":           age,
             "gender":                gender,
             "race":                  race,
             "language":              language,
@@ -863,7 +862,7 @@ else:
                 A student must maintain ≥ 90% attendance (≤ 18 missed days in a 180-day year) to
                 avoid being classified as chronically absent.
                 <br/><br/>
-                <b>Model threshold:</b> Predictions ≥ <b>40%</b> are flagged as at-risk
-                (threshold tuned for best F1 on 2026 test cohort — AUC 0.8779).
+                <b>Model threshold:</b> Scores of <b>40% or above</b> are flagged as at-risk,
+                based on testing against 331,000 real students from the most recent school year.
             </div>
             """, unsafe_allow_html=True)
