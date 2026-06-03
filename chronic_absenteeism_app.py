@@ -172,8 +172,8 @@ if page == "Executive Summary":
     # ── KPI strip — plain English only ───────────────────────────────────────
     c1, c2, c3, c4 = st.columns(4)
     kpis = [
-        ("661,681",  "Students in the Dataset",   "Across 8 school years"),
-        ("921M+",    "Daily Attendance Records",   "Every absence, tardy, and present day"),
+        ("313,136",  "Actively Enrolled Students", "Current district enrollment"),
+        ("661,681",  "Students in the Dataset",    "Includes historical & inactive enrollees across 8 years"),
         ("8 in 10",  "Predictions Are Correct",    "Tested on 331,000 real students"),
         ("33%",      "Students Flagged at Risk",   "Identified before the year begins"),
     ]
@@ -281,9 +281,9 @@ if page == "Executive Summary":
                    0.028, 0.025, 0.022, 0.020, 0.018, 0.015, 0.006],
         "Category": [
             "Attendance History", "Attendance History", "Attendance History", "Age & Grade",
-            "Economic Hardship", "Economic Hardship", "School Stability", "Health",
-            "Special Services", "Health", "Health", "Attendance History",
-            "School Stability", "Economic Hardship", "Health",
+            "Economic Hardship", "Economic Hardship", "Student Mobility", "Student Health",
+            "Special Services", "Student Health", "Student Health", "Attendance History",
+            "Student Mobility", "Economic Hardship", "Student Health",
         ],
     }).sort_values("Impact", ascending=True)
 
@@ -291,8 +291,8 @@ if page == "Executive Summary":
         "Attendance History": "#3B82F6",
         "Age & Grade":        "#8B5CF6",
         "Economic Hardship":  "#F59E0B",
-        "School Stability":   "#EF4444",
-        "Health":             "#EC4899",
+        "Student Mobility":   "#EF4444",
+        "Student Health":             "#EC4899",
         "Special Services":   "#06B6D4",
     }
     features["Color"] = features["Category"].map(cat_colors)
@@ -338,11 +338,11 @@ if page == "Executive Summary":
              "The single biggest signal. A student who struggled with attendance last year is very likely to struggle again — unless someone intervenes. This gives us a head start."),
             ("🟡", "Economic Hardship (10%)",
              "Students experiencing poverty, homelessness, or housing instability face real barriers to getting to school — transportation, work obligations, safety concerns. The model picks this up."),
-            ("🩷", "Health (9%)",
-             "Students with asthma, dental issues, or other health conditions miss more school. Something as simple as untreated toothache can keep a child home for days."),
+            ("🩷", "Student Health (9%)",
+             "Students with asthma, dental issues, or other health conditions miss more school. Something as simple as an untreated toothache can keep a child home for days."),
             ("🟣", "Age & Grade (5%)",
              "Older students, especially in high school, are more likely to disengage. Work, social pressures, and lack of connection to school all play a role."),
-            ("🔴", "School Stability (6%)",
+            ("🔴", "Student Mobility (6%)",
              "Every time a student changes schools, they lose their friends, routines, and support network. Students who have moved schools multiple times are at significantly higher risk."),
             ("🩵", "Special Services (3%)",
              "Students with IEPs and 504 plans sometimes face logistical and transportation challenges that can translate into missed days when the right supports aren't in place."),
@@ -571,13 +571,27 @@ else:
             "Grade 11":     "11",
             "Grade 12":     "12",
         }
-        # Language: strip junk entries, keep real languages only
-        _lang_junk = {"---", "N/A", "Unknown", "Other"}
-        LANGUAGE_OPTIONS = [l for l in _label_mappings["STUDENT_LANGUAGE"] if l not in _lang_junk]
+        # School / Network
+        st.markdown("<div class='section-header'>School & Network</div>", unsafe_allow_html=True)
+        sn1, sn2 = st.columns(2)
+        NETWORK_OPTIONS = [
+            "Network 1", "Network 2", "Network 3", "Network 4", "Network 5",
+            "Network 6", "Network 7", "Network 8", "Network 9", "Network 10",
+            "Charter / Contract", "Not Assigned",
+        ]
+        with sn1:
+            network = st.selectbox("Network", NETWORK_OPTIONS,
+                                   help="The network or cluster this school belongs to")
+        with sn2:
+            school_name = st.text_input("School Name", value="",
+                                        placeholder="e.g. Lincoln Elementary",
+                                        help="Used for context only — the model scores by student profile, not school identity")
+
+        st.markdown("<hr class='thin'/>", unsafe_allow_html=True)
 
         # Demographics
         st.markdown("<div class='section-header'>Demographics</div>", unsafe_allow_html=True)
-        dc1, dc2, dc3, dc4 = st.columns(4)
+        dc1, dc2, dc3 = st.columns(3)
         with dc1:
             gender_label = st.selectbox("Gender", list(GENDER_OPTIONS.keys()))
             gender = GENDER_OPTIONS[gender_label]
@@ -585,10 +599,9 @@ else:
             race_label = st.selectbox("Race", list(RACE_OPTIONS.keys()))
             race = RACE_OPTIONS[race_label]
         with dc3:
-            language = st.selectbox("Language", LANGUAGE_OPTIONS)
-        with dc4:
             grade_label = st.selectbox("Grade", list(GRADE_OPTIONS.keys()))
             grade = GRADE_OPTIONS[grade_label]
+        language = "English"  # removed from UI; default passed to model
 
         st.markdown("<hr class='thin'/>", unsafe_allow_html=True)
 
@@ -657,9 +670,11 @@ else:
 
         s9, s10 = st.columns(2)
         with s9:
-            dental_ok = st.selectbox("Dental Health Compliant", ["Yes", "No"])
+            dental_ok = st.selectbox("Dental Health Compliant", ["Yes", "No"],
+                help="Whether the student is up to date on dental screenings. Unmet dental needs are a known driver of missed school days.")
         with s10:
-            vision_ok = st.selectbox("Vision Screening Compliant", ["Yes", "No"])
+            vision_ok = st.selectbox("Vision Screening Compliant", ["Yes", "No"],
+                help="Whether the student has had a recent vision screening. Undiagnosed vision problems can lead to disengagement and absences.")
 
         st.markdown("<hr class='thin'/>", unsafe_allow_html=True)
 
