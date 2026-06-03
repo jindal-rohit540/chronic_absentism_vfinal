@@ -1,0 +1,10 @@
+venv/
+__pycache__/
+.DS_Store
+*.zip
+app.py
+Chronic_Absenteeism 0.2 (1).ipynb
+Chronic_Absenteeism 0.2.ipynb
+Chronic_Absenteeism 0.2-BuiltIn
+Built-in/gbt_chronic_absenteeism_v3.zip
+Built-in/preprocess_pipeline_v3.zip
