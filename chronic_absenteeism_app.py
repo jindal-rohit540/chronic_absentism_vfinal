@@ -1050,6 +1050,15 @@ elif page == "Network & District View":
     </div>
     """, unsafe_allow_html=True)
 
+    # Demo networks and their schools (static subset for demo clarity)
+    DEMO_NETWORKS = {
+        "Network 1":  ["ALBANY PARK", "BATEMAN", "BELDING", "CHASE", "DISNEY MAGNET"],
+        "Network 4":  ["ALCOTT ES", "AUDUBON", "BLAINE", "BURLEY", "CHASE"],
+        "Network 10": ["ASHBURN", "AZUELA", "BEASLEY", "BRIGHTON PARK", "CARDENAS"],
+        "Network 13": ["ADDAMS", "ALDRIDGE", "BARNARD", "BEIDLER", "BOND"],
+        "Charter":    ["ACERO - BRIGHTON PARK", "ACERO - CISNEROS", "ACERO - CLEMENTE", "ACERO - DE LAS CASAS", "ACERO - GARCIA"],
+    }
+
     # ── Scope selector ────────────────────────────────────────────────────────
     sc1, sc2, sc3 = st.columns([1, 1.2, 1.5])
     with sc1:
@@ -1060,20 +1069,17 @@ elif page == "Network & District View":
         )
     with sc2:
         if scope_level == "By Network":
-            networks3 = sorted(df_schools3["NETWORK"].unique().tolist())
-            selected_network = st.selectbox("Select Network", networks3)
-            scope_key = f"network::{selected_network}"
+            selected_network = st.selectbox("Select Network", list(DEMO_NETWORKS.keys()))
+            scope_key   = f"network::{selected_network}"
             scope_label = selected_network
         elif scope_level == "By School":
-            networks3 = sorted(df_schools3["NETWORK"].unique().tolist())
-            sel_net = st.selectbox("Network", networks3, key="scope_net")
-            school_list3 = df_schools3[df_schools3["NETWORK"] == sel_net]["SCHOOL_NAME"].sort_values().tolist()
+            sel_net = st.selectbox("Network", list(DEMO_NETWORKS.keys()), key="scope_net")
             with sc3:
-                sel_school = st.selectbox("School", school_list3)
-            scope_key = f"school::{sel_school}"
+                sel_school = st.selectbox("School", DEMO_NETWORKS[sel_net])
+            scope_key   = f"school::{sel_school}"
             scope_label = sel_school
         else:
-            scope_key = "district::CPS"
+            scope_key   = "district::CPS"
             scope_label = "Chicago Public Schools (District)"
             st.markdown(
                 "<div style='padding-top:28px; font-size:0.85rem; color:#64748B;'>"
@@ -1189,6 +1195,62 @@ elif page == "Network & District View":
               delta=delta_avg if any_intervention else None)
 
     st.markdown("<hr class='thin'/>", unsafe_allow_html=True)
+
+    # ── School-level breakdown (shown only when a network is selected) ─────────
+    if scope_level == "By Network":
+        st.markdown("<div class='section-header'>School-Level Risk Breakdown</div>", unsafe_allow_html=True)
+        st.markdown(
+            "<div class='section-sub'>At-risk student counts per school in this network</div>",
+            unsafe_allow_html=True,
+        )
+
+        school_rows = []
+        for school in DEMO_NETWORKS[selected_network]:
+            sc_cohort = build_cohort(f"school::{school}", n=150)
+            sc_probs  = sc_cohort["prob"].values
+            n_total   = len(sc_probs)
+            n_atrisk  = int((sc_probs >= THRESHOLD3).sum())
+            n_high    = int((sc_probs >= 0.60).sum())
+            school_rows.append({
+                "School":              school,
+                "Total Students":      n_total,
+                "At-Risk (≥40%)":      n_atrisk,
+                "High Risk (≥60%)":    n_high,
+                "At-Risk Rate":        n_atrisk / n_total,
+            })
+
+        school_df = pd.DataFrame(school_rows).sort_values("At-Risk (≥40%)", ascending=False)
+
+        # Render as styled cards
+        for _, row in school_df.iterrows():
+            rate     = row["At-Risk Rate"]
+            bar_pct  = int(rate * 100)
+            bar_col  = "#EF4444" if rate >= 0.40 else ("#F59E0B" if rate >= 0.25 else "#22C55E")
+            st.markdown(f"""
+            <div style='background:#FFFFFF; border:1px solid #E2E8F0; border-radius:10px;
+                        padding:14px 20px; margin-bottom:8px; display:flex;
+                        align-items:center; justify-content:space-between; gap:16px;'>
+                <div style='min-width:220px; font-weight:600; font-size:0.88rem; color:#1E293B;'>
+                    {row["School"]}
+                </div>
+                <div style='flex:1; background:#F1F5F9; border-radius:6px; height:10px; overflow:hidden;'>
+                    <div style='width:{bar_pct}%; background:{bar_col}; height:10px; border-radius:6px;'></div>
+                </div>
+                <div style='min-width:80px; text-align:right; font-size:0.82rem; color:#64748B;'>
+                    <b style='color:{bar_col};'>{row["At-Risk (≥40%)"]:,}</b> / {row["Total Students"]:,} at risk
+                </div>
+                <div style='min-width:60px; text-align:right; font-size:0.82rem;
+                            font-weight:700; color:{bar_col};'>{bar_pct}%</div>
+                <div style='min-width:100px; text-align:right; font-size:0.78rem; color:#EF4444;'>
+                    🔴 {row["High Risk (≥60%)"]} high risk
+                </div>
+                <a href='#' style='font-size:0.76rem; color:#3B82F6; text-decoration:none;
+                                   white-space:nowrap; opacity:0.6; cursor:not-allowed;'
+                   title='Coming soon'>⬇ Download Report</a>
+            </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown("<hr class='thin'/>", unsafe_allow_html=True)
 
     # ── Distribution chart ────────────────────────────────────────────────────
     chart_l, chart_r = st.columns([1.4, 1], gap="large")
