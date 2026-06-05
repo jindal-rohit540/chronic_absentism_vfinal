@@ -487,22 +487,18 @@ else:
     def get_contributing_factors(f, base_prob):
         """Counterfactual: neutralise each feature and measure probability drop."""
         neutrals = {
-            "Prior Year Attendance Rate":      ("att_t1",               0.95),
-            "2-Year Prior Attendance Rate":    ("att_t2",               0.95),
-            "Prior Year Tardies":              ("tardy_t1",             0),
-            "Homeless Status":                 ("homeless",             0),
-            "Medicaid Enrollment":             ("medicaid",             0),
-            "Free / Reduced Lunch":            ("lunch",                0),
-            "Chronic Medical Condition":       ("has_chronic_condition",0),
-            "Has Asthma":                      ("asthma",               0),
-            "Special Education":               ("sped",                 0),
-            "504 Plan":                        ("s504",                 0),
-            "Transferred This Year":           ("transferred_this_year",0),
-            "Lifetime School Transfers":       ("lifetime_transfers",   0),
-            "Dental Health Compliant":         ("dental_compliant",     1),
-            "Vision Screening Compliant":      ("vision_compliant",     1),
-            "Immunizations Compliant":         ("immun_compliant",      1),
-            "Health Exam Compliant":           ("health_exam_compliant",1),
+            "Prior Year Attendance Rate":   ("att_t1",             0.95),
+            "2-Year Prior Attendance Rate": ("att_t2",             0.95),
+            "Homeless":                     ("homeless",           0),
+            "Medicaid Enrolled":            ("medicaid",           0),
+            "Chronic Medical Conditions":   ("chronic_count",      0),
+            "Special Education":            ("sped",               0),
+            "504 Plan":                     ("s504",               0),
+            "Lifetime School Transfers":    ("lifetime_transfers", 0),
+            "Transfers This Year":          ("transfers_this_year",0),
+            "Dental Screening Up to Date":  ("dental_compliant",   1),
+            "Vision Screening Up to Date":  ("vision_compliant",   1),
+            "Immunizations Up to Date":     ("immun_compliant",    1),
         }
         drivers = []
         for label, (key, neutral) in neutrals.items():
@@ -609,80 +605,77 @@ else:
 
         # Attendance History
         st.markdown("<div class='section-header'>Attendance History</div>", unsafe_allow_html=True)
-        ah1, ah2, ah3 = st.columns(3)
+        ah1, ah2 = st.columns(2)
         with ah1:
             att_t1 = st.slider(
                 "Prior Year Attendance Rate",
                 min_value=0.0, max_value=1.0, value=0.95, step=0.01,
-                help="Fraction of school days attended last year (< 90% = chronically absent)",
+                help="Fraction of school days attended last year. Below 90% means the student was chronically absent.",
             )
         with ah2:
             att_t2 = st.slider(
-                "2-Year Ago Attendance Rate",
+                "2-Year Prior Attendance Rate",
                 min_value=0.0, max_value=1.0, value=0.95, step=0.01,
-                help="Attendance rate two years ago (0.95 = district average for new enrollees)",
+                help="Attendance rate two years ago.",
             )
-        with ah3:
-            age = st.slider("Student Age", min_value=4, max_value=21, value=10)
 
-        ah4, ah5 = st.columns(2)
-        with ah4:
-            tardy_t1 = st.number_input(
-                "Prior Year Tardies",
-                min_value=0, max_value=180, value=0, step=1,
-                help="Number of tardy days recorded in the prior school year",
-            )
-        with ah5:
-            was_chronic = "Yes" if att_t1 < 0.90 else "No"
-            st.markdown(f"""
-            <div style='padding-top:28px;'>
-                <div style='font-size:0.8rem; color:#64748B; font-weight:500;'>Was Chronic Last Year</div>
-                <div style='font-size:1rem; font-weight:700;
-                    color:{"#EF4444" if was_chronic == "Yes" else "#22C55E"};
-                    margin-top:4px;'>
-                    {"⚠ Yes (< 90% attendance)" if was_chronic == "Yes" else "✓ No (≥ 90% attendance)"}
-                </div>
-                <div style='font-size:0.72rem; color:#94A3B8; margin-top:2px;'>Auto-derived from prior year rate</div>
-            </div>
-            """, unsafe_allow_html=True)
+        was_chronic = "Yes" if att_t1 < 0.90 else "No"
+        st.markdown(f"""
+        <div style='padding: 6px 0 4px 0;'>
+            <span style='font-size:0.8rem; color:#64748B; font-weight:500;'>Was Chronically Absent Last Year: </span>
+            <span style='font-size:0.88rem; font-weight:700;
+                color:{"#EF4444" if was_chronic == "Yes" else "#22C55E"};'>
+                {"⚠ Yes (attendance below 90%)" if was_chronic == "Yes" else "✓ No (attendance 90% or above)"}
+            </span>
+            <span style='font-size:0.72rem; color:#94A3B8;'> — auto-derived from prior year rate</span>
+        </div>
+        """, unsafe_allow_html=True)
 
         st.markdown("<hr class='thin'/>", unsafe_allow_html=True)
 
-        # Support Services & Health
-        st.markdown("<div class='section-header'>Support Services & Health</div>", unsafe_allow_html=True)
+        # Student Mobility
+        st.markdown("<div class='section-header'>Student Mobility</div>", unsafe_allow_html=True)
+        m1, m2 = st.columns(2)
+        with m1:
+            lt = st.number_input("Lifetime School Transfers",
+                min_value=0, max_value=20, value=0, step=1,
+                help="Total number of schools the student has attended across their entire enrollment history.")
+        with m2:
+            school_transfers_this_year = st.number_input("School Transfers This Year",
+                min_value=0, max_value=10, value=0, step=1,
+                help="Number of schools the student has already transferred to this school year.")
+
+        st.markdown("<hr class='thin'/>", unsafe_allow_html=True)
+
+        # Support Services
+        st.markdown("<div class='section-header'>Support Services</div>", unsafe_allow_html=True)
         s1, s2, s3, s4 = st.columns(4)
         with s1:
             sped     = st.selectbox("Special Education", ["No", "Yes"])
         with s2:
-            lunch    = st.selectbox("Free/Reduced Lunch", ["No", "Yes"])
-        with s3:
-            medicaid = st.selectbox("Medicaid", ["No", "Yes"])
-        with s4:
-            chronic  = st.selectbox("Chronic Condition", ["No", "Yes"])
-
-        s5, s6, s7, s8 = st.columns(4)
-        with s5:
-            homeless = st.selectbox("Homeless", ["No", "Yes"])
-        with s6:
             s504     = st.selectbox("504 Plan", ["No", "Yes"])
-        with s7:
-            asthma   = st.selectbox("Has Asthma", ["No", "Yes"])
-        with s8:
-            lt       = st.number_input("Lifetime Transfers", min_value=0, max_value=20, value=0, step=1)
-
-        s9, s10 = st.columns(2)
-        with s9:
-            dental_ok = st.selectbox("Dental Health Compliant", ["Yes", "No"],
-                help="Whether the student is up to date on dental screenings. Unmet dental needs are a known driver of missed school days.")
-        with s10:
-            vision_ok = st.selectbox("Vision Screening Compliant", ["Yes", "No"],
-                help="Whether the student has had a recent vision screening. Undiagnosed vision problems can lead to disengagement and absences.")
+        with s3:
+            homeless = st.selectbox("Homeless", ["No", "Yes"])
+        with s4:
+            medicaid = st.selectbox("Medicaid Enrolled", ["No", "Yes"])
 
         st.markdown("<hr class='thin'/>", unsafe_allow_html=True)
 
-        # Mobility
-        st.markdown("<div class='section-header'>Mobility</div>", unsafe_allow_html=True)
-        transferred_this_year = st.selectbox("Transferred This Year", ["No", "Yes"])
+        # Student Health
+        st.markdown("<div class='section-header'>Student Health</div>", unsafe_allow_html=True)
+        h1, h2, h3 = st.columns(3)
+        with h1:
+            chronic_count = st.number_input("# Chronic Medical Conditions",
+                min_value=0, max_value=10, value=0, step=1,
+                help="Number of documented chronic health conditions (e.g. asthma, diabetes).")
+        with h2:
+            dental_ok = st.selectbox("Dental Screening Up to Date", ["Yes", "No"],
+                help="Unmet dental needs are a documented driver of missed school days.")
+        with h3:
+            vision_ok = st.selectbox("Vision Screening Up to Date", ["Yes", "No"],
+                help="Undiagnosed vision problems can cause disengagement and absences.")
+
+        immun_ok     = st.selectbox("Immunizations Up to Date", ["Yes", "No"], index=0)
 
         st.markdown("<br/>", unsafe_allow_html=True)
         predict_btn = st.button(
@@ -697,28 +690,27 @@ else:
         features_dict = {
             "att_t1":                att_t1,
             "att_t2":                att_t2,
-            "tardy_t1":              tardy_t1,
-            "excused_t1":            0,
+            "tardy_t1":              0,           # zero importance — kept for model input shape
+            "excused_t1":            0,           # zero importance
             "sped":                  1 if sped == "Yes" else 0,
             "homeless":              1 if homeless == "Yes" else 0,
-            "lunch":                 1 if lunch == "Yes" else 0,
+            "lunch":                 0,           # zero importance
             "medicaid":              1 if medicaid == "Yes" else 0,
-            "has_chronic_condition": 1 if chronic == "Yes" else 0,
-            "chronic_count":         1 if chronic == "Yes" else 0,
-            "asthma":                1 if asthma == "Yes" else 0,
-            "diabetes":              0,
-            "allergy":               0,
-            "seizure":               0,
+            "has_chronic_condition": 0,           # zero importance
+            "chronic_count":         chronic_count,
+            "asthma":                0,           # zero importance
+            "diabetes":              0,           # zero importance
+            "allergy":               0,           # zero importance
+            "seizure":               0,           # zero importance
             "s504":                  1 if s504 == "Yes" else 0,
             "lifetime_transfers":    lt,
-            "transfers_this_year":   0,
-            "transferred_this_year": 1 if transferred_this_year == "Yes" else 0,
+            "transfers_this_year":   school_transfers_this_year,
+            "transferred_this_year": 0,           # zero importance
             "dental_compliant":      1 if dental_ok == "Yes" else 0,
             "vision_compliant":      1 if vision_ok == "Yes" else 0,
-            "immun_compliant":       1,
+            "immun_compliant":       1 if immun_ok == "Yes" else 0,
             "health_exam_compliant": 1,
             "covid_year":            0,
-            "student_age":           age,
             "gender":                gender,
             "race":                  race,
             "language":              language,
