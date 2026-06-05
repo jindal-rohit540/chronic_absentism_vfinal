@@ -1289,12 +1289,21 @@ elif page == "Network & District View":
                 marker_color="#3B82F6",
                 opacity=0.55,
             ))
-        fig_dist.add_vline(
-            x=bin_labels[np.searchsorted(bin_centers, THRESHOLD3)],
-            line_dash="dash", line_color="#0A1628", line_width=1.5,
-            annotation_text="At-Risk Threshold (40%)",
-            annotation_position="top right",
-            annotation_font_size=10,
+        threshold_label = bin_labels[np.searchsorted(bin_centers, THRESHOLD3)]
+        fig_dist.add_shape(
+            type="line",
+            x0=threshold_label, x1=threshold_label,
+            y0=0, y1=1,
+            xref="x", yref="paper",
+            line=dict(dash="dash", color="#0A1628", width=1.5),
+        )
+        fig_dist.add_annotation(
+            x=threshold_label, y=1,
+            xref="x", yref="paper",
+            text="At-Risk Threshold (40%)",
+            showarrow=False,
+            xanchor="left",
+            font=dict(size=10, color="#0A1628"),
         )
         fig_dist.update_layout(
             height=320,
