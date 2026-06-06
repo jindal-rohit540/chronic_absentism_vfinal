@@ -150,7 +150,11 @@ with st.sidebar:
 
     page = st.radio(
         "Navigation",
-        ["Executive Summary", "Student Risk Predictor", "Network & District View"],
+        [
+            "📊  District Overview",
+            "🔍  Check a Student's Risk",
+            "🏫  School & Network View",
+        ],
         label_visibility="collapsed",
     )
 
@@ -166,7 +170,7 @@ with st.sidebar:
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE 1 — EXECUTIVE SUMMARY
 # ══════════════════════════════════════════════════════════════════════════════
-if page == "Executive Summary":
+if page == "📊  District Overview":
 
     # ── Hero header ───────────────────────────────────────────────────────────
     st.markdown("""
@@ -349,7 +353,7 @@ if page == "Executive Summary":
                 orientation="h", yanchor="bottom", y=1.02,
                 xanchor="right", x=1, font=dict(size=10),
             ),
-            font=dict(family="Inter"),
+            font=dict(family="Aptos, Segoe UI, Arial"),
         )
         st.plotly_chart(fig, use_container_width=True)
 
@@ -441,7 +445,7 @@ if page == "Executive Summary":
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE 2 — STUDENT RISK PREDICTOR
 # ══════════════════════════════════════════════════════════════════════════════
-elif page == "Student Risk Predictor":
+elif page == "🔍  Check a Student's Risk":
 
     # ── Load real XGBoost model ───────────────────────────────────────────────
     @st.cache_resource
@@ -533,20 +537,27 @@ elif page == "Student Risk Predictor":
 
     # ── Header ────────────────────────────────────────────────────────────────
     st.markdown("""
-    <div style='padding: 8px 0 20px 0;'>
-        <div style='font-size:1.6rem; font-weight:700; color:#003057;'>Single Student Risk Predictor</div>
-        <div style='font-size:0.88rem; color:#475569; margin-top:4px; max-width:680px;'>
-            Enter a student profile to get a risk score and see which factors contribute most.
-            All fields feed directly into the model — no manual overrides.
+    <div style='background:linear-gradient(135deg,#003057 0%,#00497a 100%);
+                border-radius:12px; padding:32px 40px; margin-bottom:28px;
+                border-left:6px solid #C8973A;'>
+        <div style='font-size:0.72rem; font-weight:700; letter-spacing:0.14em;
+                    color:#C8973A; text-transform:uppercase; margin-bottom:10px;'>
+            Chicago Public Schools · Student-Level Risk Assessment
+        </div>
+        <div style='font-size:1.9rem; font-weight:800; color:#FFFFFF; line-height:1.25;'>
+            Will this student be chronically absent this year?
+        </div>
+        <div style='font-size:0.92rem; color:#B8CFDF; margin-top:12px; max-width:680px; line-height:1.6;'>
+            Enter what you know about a student. The model will instantly score their risk
+            and show you exactly which factors are driving that score — so you know where to focus.
         </div>
     </div>
     """, unsafe_allow_html=True)
 
     st.markdown("""
     <div class='info-box'>
-        📌 <b>How to use:</b> Fill in what you know. Unknown values default to district averages.
-        The model produces a probability that this student will miss ≥10% of school days this year.
-        A score of <b>40% or above</b> is flagged as at-risk.
+        📌 <b>How to use:</b> Fill in what you know — leave anything uncertain at its default.
+        A score of <b>40% or above</b> means this student should be on your outreach list.
     </div>
     """, unsafe_allow_html=True)
 
@@ -588,28 +599,6 @@ elif page == "Student Risk Predictor":
             "Grade 11":     "11",
             "Grade 12":     "12",
         }
-        # School / Network — loaded from dim_schools.csv
-        @st.cache_data
-        def load_schools():
-            df = pd.read_csv("Built-in/dim_schools.csv")
-            df["NETWORK"] = df["NETWORK"].fillna("No Network")
-            return df
-
-        df_schools = load_schools()
-        networks = sorted(df_schools["NETWORK"].unique().tolist())
-
-        st.markdown("<div class='section-header'>School & Network</div>", unsafe_allow_html=True)
-        sn1, sn2 = st.columns(2)
-        with sn1:
-            network = st.selectbox("Network", networks,
-                                   help="The network or cluster this school belongs to")
-        with sn2:
-            school_list = df_schools[df_schools["NETWORK"] == network]["SCHOOL_NAME"].sort_values().tolist()
-            school_name = st.selectbox("School", school_list,
-                                       help="Used for context only — the model scores by student profile, not school identity")
-
-        st.markdown("<hr class='thin'/>", unsafe_allow_html=True)
-
         # Demographics
         st.markdown("<div class='section-header'>Demographics</div>", unsafe_allow_html=True)
         dc1, dc2, dc3 = st.columns(3)
@@ -819,7 +808,7 @@ elif page == "Student Risk Predictor":
             fig_gauge.update_layout(
                 height=200, margin=dict(l=20, r=20, t=10, b=10),
                 paper_bgcolor="white",
-                font=dict(family="Inter"),
+                font=dict(family="Aptos, Segoe UI, Arial"),
             )
             st.plotly_chart(fig_gauge, use_container_width=True)
 
@@ -859,7 +848,7 @@ elif page == "Student Risk Predictor":
                     yaxis=dict(tickfont=dict(size=10.5)),
                     paper_bgcolor="white",
                     plot_bgcolor="white",
-                    font=dict(family="Inter"),
+                    font=dict(family="Aptos, Segoe UI, Arial"),
                     showlegend=False,
                 )
                 st.plotly_chart(fig_drivers, use_container_width=True)
@@ -886,7 +875,7 @@ elif page == "Student Risk Predictor":
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE 3 — NETWORK & DISTRICT VIEW  (real predictions from predictions_by_network.csv)
 # ══════════════════════════════════════════════════════════════════════════════
-elif page == "Network & District View":
+elif page == "🏫  School & Network View":
 
     # ── Load predictions CSV ───────────────────────────────────────────────────
     @st.cache_data
