@@ -1074,17 +1074,11 @@ elif page == "Network & District View":
     if atrisk_df.empty:
         st.info("No students flagged at this setting. Try lowering the sensitivity above.")
     else:
-        # Map encoded gender back to readable
-        gender_map  = {0: "Female", 1: "Male"}
+        gender_map = {"M": "Male", "F": "Female", "N": "Non-binary", "U": "Unknown"}
         grade_label = {
             "PK": "Pre-K", "K": "Kindergarten",
             **{str(i).zfill(2): f"Grade {i}" for i in range(1, 13)},
             **{str(i): f"Grade {i}" for i in range(1, 13)},
-        }
-        race_map = {
-            0: "American Indian", 1: "Asian", 2: "Black / African American",
-            3: "Hispanic", 4: "Middle Eastern / North African", 5: "Multiracial",
-            6: "Native Hawaiian / Pacific Islander", 7: "White", 8: "Not Specified",
         }
 
         display = atrisk_df.copy()
@@ -1093,12 +1087,13 @@ elif page == "Network & District View":
         )
         display["Likelihood"]        = display["risk_score"].apply(lambda s: f"{s:.0%}")
         display["Last Year Attend."] = display["prior_yr_attendance"].apply(lambda s: f"{float(s):.0%}")
-        display["Gender"]            = display["gender"].map(gender_map).fillna("—")
+        display["Gender"]            = display["gender"].map(gender_map).fillna(display["gender"])
+        display["Race"]              = display["race"].str.replace("--", "Not Specified")
         display["Grade"]             = display["grade"].astype(str).map(grade_label).fillna(display["grade"].astype(str))
         display["School"]            = display["SCHOOL_NAME"]
         display["Student ID"]        = display["student_id"]
 
-        table_cols = ["Urgency", "Student ID", "School", "Grade", "Gender",
+        table_cols = ["Urgency", "Student ID", "School", "Grade", "Gender", "Race",
                       "Last Year Attend.", "Likelihood"]
 
         st.dataframe(

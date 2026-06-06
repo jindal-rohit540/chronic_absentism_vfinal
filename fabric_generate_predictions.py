@@ -12,11 +12,10 @@ Per Conor Moloney:
 
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
-import pandas as pd
+from pyspark.sql.types import StructType, StructField, DoubleType
 import numpy as np
 import joblib
 import os
-import shutil
 
 TARGET_YEAR = 2025   # most recent completed school year
 
@@ -35,31 +34,39 @@ dim_cohort_school_membership = spark.read.table("MDMF_COPY_RN.dbo.dim_cohort_sch
 print("All tables loaded.")
 
 # ── 2. OFFICIAL CPS SCHOOLS ONLY (Conor's filter) ─────────────────────────────
-# Join dim_school → dim_cohort_school_membership → dim_cohort_school
-# where COHORT_NAME = 'All Schools' to get only official CPS schools.
-# Use GOVERNANCE as the network grouping column.
+# Mirrors Conor's exact SQL:
+#   SELECT GOVERNANCE, count(*)
+#   FROM dim_school sch
+#   INNER JOIN dim_cohort_school_membership csm ON sch.SCHOOL_KEY = csm.SCHOOL_KEY
+#   INNER JOIN dim_cohort_school c ON c.COHORT_SCHOOL_KEY = csm.COHORT_SCHOOL_KEY
+#   WHERE c.COHORT_NAME = 'All Schools'
+#
+# Use GOVERNANCE as the grouping column (not NETWORK).
+
+cps_cohort = dim_cohort_school.filter(F.col("COHORT_NAME") == "All Schools")
+
 official_cps_schools = (
-    dim_school
+    dim_school.alias("sch")
     .join(
-        dim_cohort_school_membership,
-        on="SCHOOL_KEY",
+        dim_cohort_school_membership.alias("csm"),
+        F.col("sch.SCHOOL_KEY") == F.col("csm.SCHOOL_KEY"),
         how="inner"
     )
     .join(
-        dim_cohort_school.filter(F.col("COHORT_NAME") == "All Schools"),
-        on="COHORT_SCHOOL_KEY",
+        cps_cohort.alias("c"),
+        F.col("c.COHORT_SCHOOL_KEY") == F.col("csm.COHORT_SCHOOL_KEY"),
         how="inner"
     )
     .select(
-        dim_school["SCHOOL_KEY"],
-        dim_school["SCHOOL_NAME"],
-        dim_school["GOVERNANCE"],   # this is the network grouping per Conor
+        F.col("sch.SCHOOL_KEY"),
+        F.col("sch.SCHOOL_NAME"),
+        F.col("sch.GOVERNANCE"),
     )
     .dropDuplicates(["SCHOOL_KEY"])
 )
 
 print(f"Official CPS schools: {official_cps_schools.count():,}")
-print("Governance types:")
+print("Governance types (should match Conor's query output):")
 official_cps_schools.groupBy("GOVERNANCE").count().orderBy("count", ascending=False).show(20, truncate=False)
 
 # ── 3. GET STUDENTS ENROLLED IN OFFICIAL CPS SCHOOLS FOR TARGET YEAR ──────────
@@ -242,86 +249,85 @@ final_df = (
 
 print(f"Final feature df rows: {final_df.count():,}")
 
-# ── 10. SCORE WITH XGBOOST MODEL ──────────────────────────────────────────────
-print("Converting to pandas for scoring...")
-pdf = final_df.toPandas()
-print(f"Pandas shape: {pdf.shape}")
-
-artifact       = joblib.load("/lakehouse/default/Files/Built-in/chronic_absenteeism_xgb.pkl")
-model          = artifact["model"]
-label_encoders = artifact["label_encoders"]
+# ── 10. SCORE WITH XGBOOST MODEL (mapInPandas — runs on workers, no full toPandas) ──
+ARTIFACT_PATH = os.path.join(notebookutils.nbResPath, "builtin", "chronic_absenteeism_xgb.pkl")
+artifact         = joblib.load(ARTIFACT_PATH)
 all_feature_cols = artifact["all_feature_cols"]
-THRESHOLD      = artifact["best_threshold"]
+THRESHOLD        = artifact["best_threshold"]
 
-NUMERIC_COLS = [
-    "covid_year", "attendance_rate_t_minus_1", "attendance_rate_t_minus_2",
-    "tardy_total_t_minus_1", "excused_absences_t_minus_1",
-    "STUDENT_SPECIAL_ED_INDICATOR", "STUDENT_HOMELESS_INDICATOR",
-    "STUDENT_FOODSERVICE_INDICATOR", "STUDENT_504_INDICATOR",
-    "chronic_condition_count", "has_asthma", "has_diabetes",
-    "has_allergy", "has_seizure", "has_chronic_condition",
-    "immunizations_compliant", "health_exams_compliant",
-    "dental_compliant", "vision_compliant", "medicaid_indicator",
-    "school_transfers_this_year", "transferred_this_year",
-    "lifetime_school_transfers", "was_chronic_last_year",
-]
-CAT_COLS = [
-    "STUDENT_GENDER", "STUDENT_RACE", "STUDENT_ETHNICITY",
-    "STUDENT_LANGUAGE", "STUDENT_CURRENT_GRADE_CODE", "ENROLLMENT_HISTORY_STATUS",
-]
-
-# Label-encode categoricals
-for col in CAT_COLS:
-    le = label_encoders[col]
-    pdf[col] = pdf[col].apply(lambda v: le.transform([v])[0] if v in le.classes_ else le.transform(["Unknown"])[0])
-
-X = pdf[all_feature_cols]
-pdf["risk_score"] = model.predict_proba(X)[:, 1].round(4)
-pdf["risk_tier"]  = pd.cut(
-    pdf["risk_score"],
-    bins=[-0.001, THRESHOLD, 0.60, 1.001],
-    labels=["Low Risk", "Elevated Risk", "High Risk"]
+# Output schema: all existing columns + risk_score
+output_schema = StructType(
+    final_df.schema.fields + [StructField("risk_score", DoubleType(), True)]
 )
 
-print(f"Scored {len(pdf):,} students")
-print(pdf["risk_tier"].value_counts())
+def score_partition(iterator):
+    import joblib, pandas as pd
+    art  = joblib.load(ARTIFACT_PATH)
+    mdl  = art["model"]
+    les  = art["label_encoders"]
+    feat = art["all_feature_cols"]
+    cats = ["STUDENT_GENDER", "STUDENT_RACE", "STUDENT_ETHNICITY",
+            "STUDENT_LANGUAGE", "STUDENT_CURRENT_GRADE_CODE", "ENROLLMENT_HISTORY_STATUS"]
 
-# ── 11. BUILD OUTPUT CSV ──────────────────────────────────────────────────────
-# Keep only columns needed for dashboard — anonymize student IDs
-output = pdf[[
-    "STUDENT_KEY", "GOVERNANCE", "SCHOOL_NAME",
-    "STUDENT_CURRENT_GRADE_CODE", "STUDENT_GENDER", "STUDENT_RACE",
-    "risk_score", "risk_tier",
-    "attendance_rate_t_minus_1",
-    "STUDENT_HOMELESS_INDICATOR", "medicaid_indicator",
-    "STUDENT_SPECIAL_ED_INDICATOR", "chronic_condition_count",
-]].copy()
+    for batch in iterator:
+        X = batch[feat].copy()
+        for c in cats:
+            le = les[c]
+            X[c] = X[c].apply(
+                lambda v: le.transform([v])[0] if v in le.classes_
+                          else le.transform(["Unknown"])[0]
+            )
+        batch["risk_score"] = mdl.predict_proba(X)[:, 1].round(4)
+        yield batch
 
-output = output.rename(columns={
-    "STUDENT_CURRENT_GRADE_CODE": "grade",
-    "STUDENT_GENDER":             "gender",
-    "STUDENT_RACE":               "race",
-    "STUDENT_HOMELESS_INDICATOR": "homeless",
-    "medicaid_indicator":         "medicaid",
-    "STUDENT_SPECIAL_ED_INDICATOR": "sped",
-    "attendance_rate_t_minus_1":  "prior_yr_attendance",
-})
+print("Scoring via mapInPandas (distributed across workers)...")
+scored_df = final_df.mapInPandas(score_partition, schema=output_schema)
 
-# Anonymize: replace real STUDENT_KEY with a sequential display ID per network+school
-output = output.sort_values(["GOVERNANCE", "SCHOOL_NAME", "risk_score"], ascending=[True, True, False])
+# Assign risk tier in Spark — no pandas needed
+scored_df = scored_df.withColumn(
+    "risk_tier",
+    F.when(F.col("risk_score") <= THRESHOLD, "Low Risk")
+     .when(F.col("risk_score") <= 0.60,      "Elevated Risk")
+     .otherwise("High Risk")
+)
+
+print("Scoring complete. Risk tier distribution:")
+scored_df.groupBy("risk_tier").count().orderBy("count", ascending=False).show()
+
+# ── 11. SELECT ONLY DASHBOARD COLUMNS IN SPARK BEFORE PULLING TO DRIVER ──────
+output_df = (
+    scored_df
+    .select(
+        "STUDENT_KEY", "GOVERNANCE", "SCHOOL_NAME",
+        F.col("STUDENT_CURRENT_GRADE_CODE").alias("grade"),
+        F.col("STUDENT_GENDER").alias("gender"),
+        F.col("STUDENT_RACE").alias("race"),
+        "risk_score", "risk_tier",
+        F.col("attendance_rate_t_minus_1").alias("prior_yr_attendance"),
+        F.col("STUDENT_HOMELESS_INDICATOR").alias("homeless"),
+        F.col("medicaid_indicator").alias("medicaid"),
+        F.col("STUDENT_SPECIAL_ED_INDICATOR").alias("sped"),
+        "chronic_condition_count",
+    )
+    .orderBy("GOVERNANCE", "SCHOOL_NAME", F.col("risk_score").desc())
+)
+
+print(f"Output rows: {output_df.count():,}")
+print("Governance breakdown:")
+output_df.groupBy("GOVERNANCE").count().orderBy("count", ascending=False).show(20, truncate=False)
+
+# ── 12. PULL SLIM OUTPUT TO DRIVER, ANONYMIZE, SAVE ──────────────────────────
+# Only 12 columns pulled vs full feature set — much faster toPandas()
+output = output_df.toPandas()
 output["student_id"] = ["STU-" + str(i+1).zfill(5) for i in range(len(output))]
 output = output.drop(columns=["STUDENT_KEY"])
 
-print(f"\nOutput shape: {output.shape}")
-print(output.groupby("GOVERNANCE")[["risk_tier"]].value_counts().head(20))
-
-# ── 12. SAVE TO LAKEHOUSE + DOWNLOAD ─────────────────────────────────────────
-save_path = "/lakehouse/default/Files/Built-in/predictions_by_network.csv"
-output.to_csv(save_path, index=False)
-print(f"\nSaved to: {save_path}")
-
 builtin_dir = os.path.join(notebookutils.nbResPath, "builtin")
 os.makedirs(builtin_dir, exist_ok=True)
-shutil.copy(save_path, os.path.join(builtin_dir, "predictions_by_network.csv"))
-print("Download: Notebook Resources → builtin → predictions_by_network.csv")
+
+save_path = os.path.join(builtin_dir, "predictions_by_network.csv")
+output.to_csv(save_path, index=False)
+
+print(f"\nSaved to notebook resources: {save_path}")
+print("Download from: Notebook Resources → builtin → predictions_by_network.csv")
 print(f"Total rows: {len(output):,}")
