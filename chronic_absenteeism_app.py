@@ -936,11 +936,9 @@ elif page == "Network & District View":
     if selected_school.startswith("All Schools"):
         view_df    = network_df
         view_label = selected_network
-        show_school_breakdown = True
     else:
         view_df    = network_df[network_df["SCHOOL_NAME"] == selected_school]
         view_label = selected_school
-        show_school_breakdown = False
 
     # ── Step 3: Adjust how strict the flagging is ─────────────────────────────
     st.markdown("<div class='section-header' style='margin-top:18px;'>Step 3 — Adjust How Many Students to Flag</div>", unsafe_allow_html=True)
@@ -1013,60 +1011,80 @@ elif page == "Network & District View":
 
     st.markdown("<hr class='thin'/>", unsafe_allow_html=True)
 
-    # ── School-by-school breakdown ────────────────────────────────────────────
-    if show_school_breakdown:
-        st.markdown("<div class='section-header'>Schools Ranked by Number of Students Who Need Attention</div>", unsafe_allow_html=True)
-        st.markdown("<div class='section-sub'>Schools with the most students at risk are listed first — start your outreach planning here.</div>", unsafe_allow_html=True)
+    # ── School breakdown — always shown, top 10 by default ───────────────────
+    st.markdown("<div class='section-header'>Schools Ranked by Students Who Need Attention</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-sub'>Schools with the most at-risk students are listed first. Expand to see all schools.</div>", unsafe_allow_html=True)
 
-        school_summary = (
-            network_df.groupby("SCHOOL_NAME")
-            .apply(lambda g: pd.Series({
-                "total":   len(g),
-                "atrisk":  int((g["risk_score"] >= THRESHOLD_DISPLAY).sum()),
-                "urgent":  int((g["risk_score"] >= 0.60).sum()),
-            }), include_groups=False)
-            .reset_index()
-        )
-        school_summary["rate"] = school_summary["atrisk"] / school_summary["total"]
-        school_summary = school_summary.sort_values("atrisk", ascending=False)
+    school_summary = (
+        network_df.groupby("SCHOOL_NAME")
+        .apply(lambda g: pd.Series({
+            "total":  len(g),
+            "atrisk": int((g["risk_score"] >= THRESHOLD_DISPLAY).sum()),
+            "urgent": int((g["risk_score"] >= 0.60).sum()),
+        }), include_groups=False)
+        .reset_index()
+    )
+    school_summary["rate"] = school_summary["atrisk"] / school_summary["total"]
+    school_summary = school_summary.sort_values("atrisk", ascending=False).reset_index(drop=True)
 
-        for _, row in school_summary.iterrows():
-            bar_pct = int(row["rate"] * 100)
-            bar_col = "#EF4444" if row["rate"] >= 0.40 else ("#F59E0B" if row["rate"] >= 0.25 else "#22C55E")
-            urgency_tag = ""
-            if row["rate"] >= 0.40:
-                urgency_tag = "<span style='background:#FEF2F2; color:#DC2626; font-size:0.7rem; font-weight:700; padding:2px 8px; border-radius:20px; margin-left:8px;'>HIGH NEED</span>"
-            elif row["rate"] >= 0.25:
-                urgency_tag = "<span style='background:#FFFBEB; color:#D97706; font-size:0.7rem; font-weight:700; padding:2px 8px; border-radius:20px; margin-left:8px;'>MODERATE</span>"
-            st.markdown(f"""
-            <div style='background:#FFFFFF; border:1px solid #E2E8F0; border-radius:10px;
-                        padding:16px 22px; margin-bottom:8px;'>
-                <div style='display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;'>
-                    <div style='font-weight:700; font-size:0.92rem; color:#1E293B;'>
-                        {row["SCHOOL_NAME"]}{urgency_tag}
-                    </div>
-                    <div style='font-size:0.82rem; color:#64748B;'>
-                        <b style='color:{bar_col}; font-size:1.05rem;'>{int(row["atrisk"]):,}</b>
-                        &nbsp;of {int(row["total"]):,} students need follow-up
-                        &nbsp;·&nbsp;
-                        <span style='color:#EF4444; font-weight:600;'>{int(row["urgent"])} urgent</span>
-                    </div>
+    show_all_schools = st.toggle(f"Show all {len(school_summary)} schools", value=False)
+    schools_to_show  = school_summary if show_all_schools else school_summary.head(10)
+
+    for _, row in schools_to_show.iterrows():
+        bar_pct = int(row["rate"] * 100)
+        bar_col = "#EF4444" if row["rate"] >= 0.40 else ("#F59E0B" if row["rate"] >= 0.25 else "#22C55E")
+        urgency_tag = ""
+        if row["rate"] >= 0.40:
+            urgency_tag = "<span style='background:#FEF2F2; color:#DC2626; font-size:0.7rem; font-weight:700; padding:2px 8px; border-radius:20px; margin-left:8px;'>HIGH NEED</span>"
+        elif row["rate"] >= 0.25:
+            urgency_tag = "<span style='background:#FFFBEB; color:#D97706; font-size:0.7rem; font-weight:700; padding:2px 8px; border-radius:20px; margin-left:8px;'>MODERATE</span>"
+        st.markdown(f"""
+        <div style='background:#FFFFFF; border:1px solid #E2E8F0; border-radius:10px;
+                    padding:16px 22px; margin-bottom:8px;'>
+            <div style='display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;'>
+                <div style='font-weight:700; font-size:0.92rem; color:#1E293B;'>
+                    {row["SCHOOL_NAME"]}{urgency_tag}
                 </div>
-                <div style='background:#F1F5F9; border-radius:6px; height:10px; overflow:hidden;'>
-                    <div style='width:{bar_pct}%; background:{bar_col}; height:10px; border-radius:6px;'></div>
+                <div style='font-size:0.82rem; color:#64748B;'>
+                    <b style='color:{bar_col}; font-size:1.05rem;'>{int(row["atrisk"]):,}</b>
+                    &nbsp;of {int(row["total"]):,} students need follow-up
+                    &nbsp;·&nbsp;
+                    <span style='color:#EF4444; font-weight:600;'>{int(row["urgent"])} urgent</span>
                 </div>
-                <div style='font-size:0.74rem; color:#94A3B8; margin-top:4px;'>{bar_pct}% of students at this school flagged</div>
             </div>
-            """, unsafe_allow_html=True)
+            <div style='background:#F1F5F9; border-radius:6px; height:10px; overflow:hidden;'>
+                <div style='width:{bar_pct}%; background:{bar_col}; height:10px; border-radius:6px;'></div>
+            </div>
+            <div style='font-size:0.74rem; color:#94A3B8; margin-top:4px;'>{bar_pct}% of students at this school flagged</div>
+        </div>
+        """, unsafe_allow_html=True)
 
-        st.markdown("<hr class='thin'/>", unsafe_allow_html=True)
+    st.markdown("<hr class='thin'/>", unsafe_allow_html=True)
 
-    # ── Student list ──────────────────────────────────────────────────────────
+    # ── Student list — filtered by school ────────────────────────────────────
     st.markdown("<div class='section-header'>Students Who Need a Follow-Up This Year</div>", unsafe_allow_html=True)
-    st.markdown(f"<div class='section-sub'>Sorted by who needs attention most urgently. Showing students in <b>{view_label}</b>.</div>", unsafe_allow_html=True)
+
+    # School picker — defaults to top school by at-risk count
+    top_schools_ordered = school_summary["SCHOOL_NAME"].tolist()
+    sc_col1, sc_col2 = st.columns([2, 3])
+    with sc_col1:
+        selected_school_for_table = st.selectbox(
+            "Filter by school",
+            ["All Schools in " + selected_network] + top_schools_ordered,
+            label_visibility="visible",
+        )
+
+    if selected_school_for_table.startswith("All Schools"):
+        table_source_df = network_df
+        table_label     = selected_network
+    else:
+        table_source_df = network_df[network_df["SCHOOL_NAME"] == selected_school_for_table]
+        table_label     = selected_school_for_table
+
+    st.markdown(f"<div class='section-sub'>Sorted by urgency. Showing students in <b>{table_label}</b>.</div>", unsafe_allow_html=True)
 
     atrisk_df = (
-        view_df[view_df["risk_score"] >= THRESHOLD_DISPLAY]
+        table_source_df[table_source_df["risk_score"] >= THRESHOLD_DISPLAY]
         .sort_values("risk_score", ascending=False)
         .reset_index(drop=True)
     )
@@ -1082,9 +1100,7 @@ elif page == "Network & District View":
         }
 
         display = atrisk_df.copy()
-        display["Urgency"]           = display["risk_score"].apply(
-            lambda s: "🔴 Urgent" if s >= 0.60 else "🟡 Follow Up"
-        )
+        display["Urgency"]           = display["risk_score"].apply(lambda s: "🔴 Urgent" if s >= 0.60 else "🟡 Follow Up")
         display["Likelihood"]        = display["risk_score"].apply(lambda s: f"{s:.0%}")
         display["Last Year Attend."] = display["prior_yr_attendance"].apply(lambda s: f"{float(s):.0%}")
         display["Gender"]            = display["gender"].map(gender_map).fillna(display["gender"])
@@ -1100,7 +1116,7 @@ elif page == "Network & District View":
             display[table_cols],
             use_container_width=True,
             hide_index=True,
-            height=min(420, 48 + len(display) * 35),
+            height=500,
             column_config={
                 "Urgency":           st.column_config.TextColumn("Urgency", width="small"),
                 "Likelihood":        st.column_config.TextColumn("Likelihood of Missing School", width="medium"),
@@ -1110,16 +1126,16 @@ elif page == "Network & District View":
 
         st.markdown(f"""
         <div style='font-size:0.78rem; color:#64748B; margin: 8px 0 12px 0;'>
-            Showing <b>{len(display):,} students</b> flagged for follow-up in <b>{view_label}</b>.
+            Showing <b>{len(display):,} students</b> flagged for follow-up in <b>{table_label}</b>.
             Student names are not shown — IDs can be matched to school records by your data team.
         </div>
         """, unsafe_allow_html=True)
 
         csv_bytes = display[table_cols].to_csv(index=False).encode()
         st.download_button(
-            label=f"⬇  Download this list as a spreadsheet",
+            label="⬇  Download this list as a spreadsheet",
             data=csv_bytes,
-            file_name=f"students_needing_followup_{view_label.replace(' ', '_')}.csv",
+            file_name=f"students_needing_followup_{table_label.replace(' ', '_')}.csv",
             mime="text/csv",
             type="primary",
         )
