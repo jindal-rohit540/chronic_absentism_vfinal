@@ -889,7 +889,6 @@ elif page == "Network & District View":
         st.stop()
 
     df_pred = load_predictions()
-    THRESHOLD_DISPLAY = 0.40
 
     # ── Header ────────────────────────────────────────────────────────────────
     st.markdown("""
@@ -910,14 +909,22 @@ elif page == "Network & District View":
     </div>
     """, unsafe_allow_html=True)
 
-    # ── Network selector ──────────────────────────────────────────────────────
+    # ── Controls row ──────────────────────────────────────────────────────────
     available_networks = sorted(df_pred["NETWORK"].dropna().unique().tolist())
 
-    sel_col1, sel_col2 = st.columns([1, 2])
+    sel_col1, sel_col2, sel_col3 = st.columns([1, 2, 1.2])
     with sel_col1:
         view_level = st.selectbox("View Level", ["By Network", "By School"])
     with sel_col2:
         selected_network = st.selectbox("Select Network", available_networks)
+    with sel_col3:
+        THRESHOLD_DISPLAY = st.slider(
+            "At-Risk Threshold",
+            min_value=0.30, max_value=0.70, value=0.40, step=0.05,
+            format="%.0f%%",
+            help="Students with a risk score at or above this threshold are flagged as at-risk. "
+                 "Model default is 40% (best F1). Raise to reduce false positives.",
+        )
 
     network_df = df_pred[df_pred["NETWORK"] == selected_network]
 
