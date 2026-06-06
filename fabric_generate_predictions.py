@@ -1,7 +1,13 @@
 """
 Fabric Notebook — Generate network/school level predictions
 Run in Microsoft Fabric (PySpark kernel).
-Output: predictions_by_network.csv — one row per student with NETWORK, SCHOOL_NAME, risk_score, risk_tier
+Output: predictions_by_network.csv — one row per student with GOVERNANCE, SCHOOL_NAME, risk_score, risk_tier
+
+Per Conor Moloney:
+  - Use GOVERNANCE (not NETWORK) as the grouping column
+  - Only include official CPS schools by joining dim_cohort_school_membership
+    where COHORT_NAME = 'All Schools'
+  - Covers all networks + district-level rollup
 """
 
 from pyspark.sql import functions as F
@@ -12,42 +18,60 @@ import joblib
 import os
 import shutil
 
-# ── CONFIG: pick which networks to score ──────────────────────────────────────
-TARGET_NETWORKS = ["Network 1", "Network 5", "Network 8"]   # change as needed
-TARGET_YEAR     = 2025   # most recent completed school year
+TARGET_YEAR = 2025   # most recent completed school year
 
 # ── 1. LOAD TABLES ────────────────────────────────────────────────────────────
 print("Loading tables...")
-fact_attendance = spark.read.table("MDMF_COPY_RN.dbo.fact_attendance")
-dim_student     = spark.read.table("MDMF_COPY_RN.dbo.dim_student")
-fact_med        = spark.read.table("MDMF_COPY_RN.dbo.fact_student_medical_condition")
-dim_med_cond    = spark.read.table("MDMF_COPY_RN.dbo.dim_medical_condition")
-health_ind      = spark.read.table("MDMF_COPY_RN.dbo.dim_student_health_indicator")
-dim_medicaid    = spark.read.table("MDMF_COPY_RN.dbo.dim_medicaid")
-fact_enroll     = spark.read.table("MDMF_COPY_RN.dbo.fact_enrollment_annualized")
-dim_school      = spark.read.table("MDMF_COPY_RN.dbo.dim_school")
+fact_attendance  = spark.read.table("MDMF_COPY_RN.dbo.fact_attendance")
+dim_student      = spark.read.table("MDMF_COPY_RN.dbo.dim_student")
+fact_med         = spark.read.table("MDMF_COPY_RN.dbo.fact_student_medical_condition")
+dim_med_cond     = spark.read.table("MDMF_COPY_RN.dbo.dim_medical_condition")
+health_ind       = spark.read.table("MDMF_COPY_RN.dbo.dim_student_health_indicator")
+dim_medicaid     = spark.read.table("MDMF_COPY_RN.dbo.dim_medicaid")
+fact_enroll      = spark.read.table("MDMF_COPY_RN.dbo.fact_enrollment_annualized")
+dim_school       = spark.read.table("MDMF_COPY_RN.dbo.dim_school")
+dim_cohort_school         = spark.read.table("MDMF_COPY_RN.dbo.dim_cohort_school")
+dim_cohort_school_membership = spark.read.table("MDMF_COPY_RN.dbo.dim_cohort_school_membership")
 print("All tables loaded.")
 
-# ── 2. BUILD SCHOOL LOOKUP: SCHOOL_KEY → SCHOOL_NAME, NETWORK ─────────────────
-school_lookup = (
+# ── 2. OFFICIAL CPS SCHOOLS ONLY (Conor's filter) ─────────────────────────────
+# Join dim_school → dim_cohort_school_membership → dim_cohort_school
+# where COHORT_NAME = 'All Schools' to get only official CPS schools.
+# Use GOVERNANCE as the network grouping column.
+official_cps_schools = (
     dim_school
-    .select("SCHOOL_KEY", "SCHOOL_NAME", "NETWORK")
+    .join(
+        dim_cohort_school_membership,
+        on="SCHOOL_KEY",
+        how="inner"
+    )
+    .join(
+        dim_cohort_school.filter(F.col("COHORT_NAME") == "All Schools"),
+        on="COHORT_SCHOOL_KEY",
+        how="inner"
+    )
+    .select(
+        dim_school["SCHOOL_KEY"],
+        dim_school["SCHOOL_NAME"],
+        dim_school["GOVERNANCE"],   # this is the network grouping per Conor
+    )
     .dropDuplicates(["SCHOOL_KEY"])
-    .filter(F.col("NETWORK").isin(TARGET_NETWORKS))
 )
-print(f"Schools in target networks: {school_lookup.count():,}")
 
-# ── 3. GET STUDENTS ENROLLED IN TARGET NETWORKS FOR TARGET YEAR ───────────────
-# One row per student — their primary school in TARGET_YEAR
+print(f"Official CPS schools: {official_cps_schools.count():,}")
+print("Governance types:")
+official_cps_schools.groupBy("GOVERNANCE").count().orderBy("count", ascending=False).show(20, truncate=False)
+
+# ── 3. GET STUDENTS ENROLLED IN OFFICIAL CPS SCHOOLS FOR TARGET YEAR ──────────
 students_in_scope = (
     fact_enroll
     .filter(F.col("SCHOOL_YEAR") == TARGET_YEAR)
     .filter(F.col("ENROLLMENT_TYPE") == "PRIMARY")
-    .join(school_lookup, on="SCHOOL_KEY", how="inner")   # inner = only target networks
+    .join(official_cps_schools, on="SCHOOL_KEY", how="inner")
     .groupBy("STUDENT_KEY")
     .agg(
-        F.first("SCHOOL_NAME", ignorenulls=True).alias("SCHOOL_NAME"),
-        F.first("NETWORK",     ignorenulls=True).alias("NETWORK"),
+        F.first("SCHOOL_NAME",  ignorenulls=True).alias("SCHOOL_NAME"),
+        F.first("GOVERNANCE",   ignorenulls=True).alias("GOVERNANCE"),
     )
 )
 print(f"Students in scope: {students_in_scope.count():,}")
@@ -94,7 +118,7 @@ spine = (
     .filter(F.col("school_year") == TARGET_YEAR)
     .join(students_in_scope, on="STUDENT_KEY", how="inner")
     .select(
-        "STUDENT_KEY", "school_year", "covid_year", "SCHOOL_NAME", "NETWORK",
+        "STUDENT_KEY", "school_year", "covid_year", "SCHOOL_NAME", "GOVERNANCE",
         "attendance_rate_t_minus_1", "attendance_rate_t_minus_2",
         "tardy_total_t_minus_1", "excused_absences_t_minus_1",
     )
@@ -195,7 +219,7 @@ final_df = (
           (spine["STUDENT_KEY"] == F.col("ltrn.STUDENT_KEY")) & (spine["prior_school_year"] == F.col("ltrn.SCHOOL_YEAR")),
           how="left")
     .select(
-        spine["STUDENT_KEY"], spine["school_year"], spine["SCHOOL_NAME"], spine["NETWORK"],
+        spine["STUDENT_KEY"], spine["school_year"], spine["SCHOOL_NAME"], spine["GOVERNANCE"],
         "covid_year",
         "attendance_rate_t_minus_1", "attendance_rate_t_minus_2",
         "tardy_total_t_minus_1", "excused_absences_t_minus_1",
@@ -265,7 +289,7 @@ print(pdf["risk_tier"].value_counts())
 # ── 11. BUILD OUTPUT CSV ──────────────────────────────────────────────────────
 # Keep only columns needed for dashboard — anonymize student IDs
 output = pdf[[
-    "STUDENT_KEY", "NETWORK", "SCHOOL_NAME",
+    "STUDENT_KEY", "GOVERNANCE", "SCHOOL_NAME",
     "STUDENT_CURRENT_GRADE_CODE", "STUDENT_GENDER", "STUDENT_RACE",
     "risk_score", "risk_tier",
     "attendance_rate_t_minus_1",
@@ -284,12 +308,12 @@ output = output.rename(columns={
 })
 
 # Anonymize: replace real STUDENT_KEY with a sequential display ID per network+school
-output = output.sort_values(["NETWORK", "SCHOOL_NAME", "risk_score"], ascending=[True, True, False])
+output = output.sort_values(["GOVERNANCE", "SCHOOL_NAME", "risk_score"], ascending=[True, True, False])
 output["student_id"] = ["STU-" + str(i+1).zfill(5) for i in range(len(output))]
 output = output.drop(columns=["STUDENT_KEY"])
 
 print(f"\nOutput shape: {output.shape}")
-print(output.groupby("NETWORK")[["risk_tier"]].value_counts().head(20))
+print(output.groupby("GOVERNANCE")[["risk_tier"]].value_counts().head(20))
 
 # ── 12. SAVE TO LAKEHOUSE + DOWNLOAD ─────────────────────────────────────────
 save_path = "/lakehouse/default/Files/Built-in/predictions_by_network.csv"

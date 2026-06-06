@@ -913,12 +913,16 @@ elif page == "Network & District View":
     st.markdown("<div class='section-header'>Step 1 — Choose a Network</div>", unsafe_allow_html=True)
     st.markdown("<div class='section-sub'>Select the network you want to review. All schools in that network will appear below.</div>", unsafe_allow_html=True)
 
-    available_networks = sorted(df_pred["NETWORK"].dropna().unique().tolist())
+    available_networks = ["Entire District (All CPS)"] + sorted(df_pred["GOVERNANCE"].dropna().unique().tolist())
 
     nc1, nc2 = st.columns([1.5, 2.5])
     with nc1:
         selected_network = st.selectbox("Network", available_networks, label_visibility="collapsed")
-    network_df = df_pred[df_pred["NETWORK"] == selected_network]
+
+    if selected_network == "Entire District (All CPS)":
+        network_df = df_pred.copy()
+    else:
+        network_df = df_pred[df_pred["GOVERNANCE"] == selected_network]
 
     # ── Step 2: Optionally drill into one school ───────────────────────────────
     st.markdown("<div class='section-header' style='margin-top:18px;'>Step 2 — Drill Into a School (Optional)</div>", unsafe_allow_html=True)
