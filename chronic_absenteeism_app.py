@@ -6,7 +6,7 @@ import joblib
 
 st.set_page_config(
     page_title="CPS | Chronic Absenteeism Early Warning",
-    page_icon="https://www.cps.edu/globalassets/cps-pages/about/cps-logo.png",
+    page_icon="🏫",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -136,8 +136,12 @@ div[data-testid="stNumberInput"] > div { border-radius: 6px !important; }
 with st.sidebar:
     st.markdown("""
     <div style='text-align:center; padding:24px 16px 14px 16px;'>
-        <img src='https://www.cps.edu/globalassets/cps-pages/about/cps-logo.png'
-             style='height:56px; margin-bottom:12px;' onerror="this.style.display='none'"/>
+        <div style='display:inline-flex; align-items:center; justify-content:center;
+                    width:64px; height:64px; border-radius:50%;
+                    background:#C8973A; margin-bottom:12px;'>
+            <span style='font-size:1.5rem; font-weight:900; color:#003057;
+                         letter-spacing:-1px;'>CPS</span>
+        </div>
         <div style='font-size:0.65rem; font-weight:700; letter-spacing:0.14em;
                     color:#C8973A; text-transform:uppercase; margin-bottom:4px;'>
             Enterprise Analytics &amp; Architecture
