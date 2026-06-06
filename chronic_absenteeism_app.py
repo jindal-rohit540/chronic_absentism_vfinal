@@ -5,125 +5,148 @@ import plotly.graph_objects as go
 import joblib
 
 st.set_page_config(
-    page_title="Chronic Absenteeism Risk Intelligence",
-    page_icon="🎓",
+    page_title="CPS | Chronic Absenteeism Early Warning",
+    page_icon="https://www.cps.edu/globalassets/cps-pages/about/cps-logo.png",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# ── Global style ──────────────────────────────────────────────────────────────
+# ── CPS EAS Brand Colors ───────────────────────────────────────────────────────
+# Navy:  #003057   Gold: #C8973A   Light blue: #4A90C4   White: #FFFFFF
+# ──────────────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+/* Aptos is the CPS EAS official font — fall back to Segoe UI (Windows) then sans-serif */
+@import url('https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@300;400;600;700;800&display=swap');
 
-html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
-
-/* Sidebar */
-[data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #0A1628 0%, #112240 100%);
-    border-right: 1px solid #1e3a5f;
+html, body, [class*="css"], * {
+    font-family: Aptos, 'Nunito Sans', 'Segoe UI', Arial, sans-serif !important;
 }
-[data-testid="stSidebar"] * { color: #CBD5E1 !important; }
+
+/* ── Sidebar — CPS Navy ── */
+[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #003057 0%, #00213d 100%);
+    border-right: 3px solid #C8973A;
+}
+[data-testid="stSidebar"] * { color: #E8EDF2 !important; }
 [data-testid="stSidebar"] .stRadio label {
     padding: 10px 14px !important;
-    border-radius: 8px !important;
+    border-radius: 6px !important;
     cursor: pointer;
     transition: background 0.2s;
 }
-[data-testid="stSidebar"] .stRadio label:hover { background: rgba(255,255,255,0.08) !important; }
+[data-testid="stSidebar"] .stRadio label:hover { background: rgba(200,151,58,0.15) !important; }
 
-/* Cards */
+/* ── Metric cards ── */
 .metric-card {
     background: #FFFFFF;
-    border: 1px solid #E2E8F0;
-    border-radius: 12px;
+    border: 1px solid #D1DBE8;
+    border-top: 3px solid #003057;
+    border-radius: 8px;
     padding: 24px 20px;
     text-align: center;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    box-shadow: 0 2px 6px rgba(0,48,87,0.08);
 }
 .metric-card .metric-value {
     font-size: 2.2rem;
-    font-weight: 700;
-    color: #0A1628;
+    font-weight: 800;
+    color: #003057;
     line-height: 1.1;
 }
 .metric-card .metric-label {
     font-size: 0.78rem;
-    font-weight: 600;
-    color: #64748B;
+    font-weight: 700;
+    color: #003057;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.06em;
     margin-top: 6px;
 }
 .metric-card .metric-sub {
-    font-size: 0.75rem;
-    color: #94A3B8;
+    font-size: 0.74rem;
+    color: #64748B;
     margin-top: 4px;
 }
 
-/* Section headers */
+/* ── Section headers — gold left border (CPS accent) ── */
 .section-header {
-    font-size: 1.15rem;
+    font-size: 1.1rem;
     font-weight: 700;
-    color: #0A1628;
+    color: #003057;
     margin-bottom: 4px;
-    border-left: 4px solid #DC2626;
+    border-left: 4px solid #C8973A;
     padding-left: 12px;
 }
 .section-sub {
     font-size: 0.82rem;
-    color: #64748B;
+    color: #4A6580;
     margin-bottom: 16px;
     padding-left: 16px;
 }
 
-/* Risk badge */
-.risk-high   { background:#FEF2F2; border:2px solid #EF4444; border-radius:12px; padding:20px 24px; }
-.risk-medium { background:#FFFBEB; border:2px solid #F59E0B; border-radius:12px; padding:20px 24px; }
-.risk-low    { background:#F0FDF4; border:2px solid #22C55E; border-radius:12px; padding:20px 24px; }
+/* ── Risk badges ── */
+.risk-high   { background:#FEF2F2; border:2px solid #EF4444; border-radius:8px; padding:20px 24px; }
+.risk-medium { background:#FFFBEB; border:2px solid #C8973A; border-radius:8px; padding:20px 24px; }
+.risk-low    { background:#F0FDF4; border:2px solid #22C55E; border-radius:8px; padding:20px 24px; }
 
+/* ── Insight cards ── */
 .insight-card {
-    background: #F8FAFC;
-    border-left: 4px solid #3B82F6;
+    background: #F5F8FB;
+    border-left: 4px solid #4A90C4;
     border-radius: 0 8px 8px 0;
     padding: 14px 18px;
     margin-bottom: 10px;
 }
-.insight-card .title { font-weight: 600; color: #1E293B; font-size: 0.9rem; }
-.insight-card .body  { font-size: 0.82rem; color: #475569; margin-top: 4px; }
+.insight-card .title { font-weight: 700; color: #003057; font-size: 0.9rem; }
+.insight-card .body  { font-size: 0.82rem; color: #334D66; margin-top: 4px; }
 
+/* ── Info box ── */
 .info-box {
-    background: #EFF6FF;
-    border: 1px solid #BFDBFE;
-    border-radius: 8px;
+    background: #EBF3FA;
+    border: 1px solid #4A90C4;
+    border-radius: 6px;
     padding: 12px 16px;
     font-size: 0.82rem;
-    color: #1D4ED8;
+    color: #003057;
     margin-bottom: 12px;
 }
 
-/* Section divider */
-hr.thin { border: none; border-top: 1px solid #E2E8F0; margin: 20px 0; }
+/* ── Divider ── */
+hr.thin { border: none; border-top: 1px solid #D1DBE8; margin: 20px 0; }
 
-/* Wider form inputs */
+/* ── Inputs ── */
 div[data-testid="stSelectbox"] > div,
-div[data-testid="stNumberInput"] > div { border-radius: 8px !important; }
+div[data-testid="stNumberInput"] > div { border-radius: 6px !important; }
+
+/* ── Streamlit primary button → CPS Navy ── */
+.stButton > button[kind="primary"] {
+    background: #003057 !important;
+    border: none !important;
+    color: white !important;
+    border-radius: 6px !important;
+    font-weight: 700 !important;
+}
+.stButton > button[kind="primary"]:hover {
+    background: #C8973A !important;
+    color: #003057 !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
 # ── Navigation ────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("""
-    <div style='text-align:center; padding: 20px 0 10px 0;'>
-        <div style='font-size:2rem;'>🎓</div>
-        <div style='font-size:1rem; font-weight:700; color:#F1F5F9; margin-top:6px;'>
-            Absenteeism Intelligence
+    <div style='text-align:center; padding:24px 16px 14px 16px;'>
+        <img src='https://www.cps.edu/globalassets/cps-pages/about/cps-logo.png'
+             style='height:56px; margin-bottom:12px;' onerror="this.style.display='none'"/>
+        <div style='font-size:0.65rem; font-weight:700; letter-spacing:0.14em;
+                    color:#C8973A; text-transform:uppercase; margin-bottom:4px;'>
+            Enterprise Analytics &amp; Architecture
         </div>
-        <div style='font-size:0.72rem; color:#94A3B8; margin-top:2px;'>
-            Powered by Gradient Boosted Trees
+        <div style='font-size:1rem; font-weight:800; color:#FFFFFF; line-height:1.3;'>
+            Chronic Absenteeism<br>Early Warning System
         </div>
     </div>
-    <hr style='border-color:#1e3a5f; margin:12px 0 20px 0;'/>
+    <hr style='border-color:#C8973A; margin:4px 0 18px 0; opacity:0.4;'/>
     """, unsafe_allow_html=True)
 
     page = st.radio(
@@ -133,11 +156,11 @@ with st.sidebar:
     )
 
     st.markdown("""
-    <hr style='border-color:#1e3a5f; margin:20px 0 12px 0;'/>
-    <div style='font-size:0.7rem; color:#475569; text-align:center; line-height:1.6;'>
-        Trained on <b style='color:#94A3B8;'>529,405 students</b><br>
-        Accuracy: <b style='color:#94A3B8;'>80%</b> on unseen data<br>
-        Data: AY 2018 – 2026
+    <hr style='border-color:#C8973A; margin:20px 0 12px 0; opacity:0.3;'/>
+    <div style='font-size:0.7rem; color:#8FA8C0; text-align:center; line-height:1.8;'>
+        Trained on <b style='color:#C8973A;'>529,405 students</b><br>
+        Accuracy: <b style='color:#C8973A;'>80%</b> on unseen data<br>
+        Academic Years 2018 – 2026
     </div>
     """, unsafe_allow_html=True)
 
@@ -148,21 +171,22 @@ if page == "Executive Summary":
 
     # ── Hero header ───────────────────────────────────────────────────────────
     st.markdown("""
-    <div style='background:linear-gradient(135deg,#0A1628 0%,#1e3a5f 100%);
-                border-radius:16px; padding:36px 40px; margin-bottom:28px;'>
-        <div style='font-size:0.78rem; font-weight:600; letter-spacing:0.12em;
-                    color:#60A5FA; text-transform:uppercase; margin-bottom:10px;'>
-            Early Warning System — District Analytics
+    <div style='background:linear-gradient(135deg,#003057 0%,#00497a 100%);
+                border-radius:12px; padding:36px 40px; margin-bottom:28px;
+                border-left:6px solid #C8973A;'>
+        <div style='font-size:0.72rem; font-weight:700; letter-spacing:0.14em;
+                    color:#C8973A; text-transform:uppercase; margin-bottom:10px;'>
+            Chicago Public Schools · Data &amp; Analytics · Early Warning System
         </div>
-        <div style='font-size:2rem; font-weight:800; color:#F1F5F9; line-height:1.25;
+        <div style='font-size:2rem; font-weight:800; color:#FFFFFF; line-height:1.25;
                     max-width:700px;'>
             Predicting Student Absenteeism<br>Before It Becomes a Crisis
         </div>
-        <div style='font-size:0.95rem; color:#94A3B8; margin-top:14px; max-width:640px; line-height:1.6;'>
-            Every year, thousands of students slip into chronic absenteeism — missing so many days
-            that they fall behind and never catch up. This tool uses historical data to identify
-            those students <b style='color:#F1F5F9;'>at the very start of the school year</b>,
-            so staff can step in early, not too late.
+        <div style='font-size:0.95rem; color:#B8CFDF; margin-top:14px; max-width:640px; line-height:1.6;'>
+            Every year, thousands of CPS students slip into chronic absenteeism — missing so many days
+            that they fall behind and never catch up. This tool uses 8 years of district records to flag
+            those students <b style='color:#FFFFFF;'>at the start of the school year</b>,
+            so counselors and family liaisons can step in before it is too late.
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -511,7 +535,7 @@ elif page == "Student Risk Predictor":
     # ── Header ────────────────────────────────────────────────────────────────
     st.markdown("""
     <div style='padding: 8px 0 20px 0;'>
-        <div style='font-size:1.6rem; font-weight:700; color:#0A1628;'>Single Student Risk Predictor</div>
+        <div style='font-size:1.6rem; font-weight:700; color:#003057;'>Single Student Risk Predictor</div>
         <div style='font-size:0.88rem; color:#475569; margin-top:4px; max-width:680px;'>
             Enter a student profile to get a risk score and see which factors contribute most.
             All fields feed directly into the model — no manual overrides.
@@ -787,7 +811,7 @@ elif page == "Student Risk Predictor":
                         dict(range=[60, 100],color="#FEF2F2"),
                     ],
                     threshold=dict(
-                        line=dict(color="#0A1628", width=3),
+                        line=dict(color="#003057", width=3),
                         thickness=0.8,
                         value=pct,
                     ),
@@ -892,19 +916,20 @@ elif page == "Network & District View":
 
     # ── Header ────────────────────────────────────────────────────────────────
     st.markdown("""
-    <div style='background:linear-gradient(135deg,#0A1628 0%,#1e3a5f 100%);
-                border-radius:16px; padding:32px 40px; margin-bottom:28px;'>
-        <div style='font-size:0.78rem; font-weight:600; letter-spacing:0.12em;
-                    color:#60A5FA; text-transform:uppercase; margin-bottom:10px;'>
-            Network & School View
+    <div style='background:linear-gradient(135deg,#003057 0%,#00497a 100%);
+                border-radius:12px; padding:32px 40px; margin-bottom:28px;
+                border-left:6px solid #C8973A;'>
+        <div style='font-size:0.72rem; font-weight:700; letter-spacing:0.14em;
+                    color:#C8973A; text-transform:uppercase; margin-bottom:10px;'>
+            Chicago Public Schools · Network &amp; School View
         </div>
-        <div style='font-size:1.9rem; font-weight:800; color:#F1F5F9; line-height:1.25;'>
+        <div style='font-size:1.9rem; font-weight:800; color:#FFFFFF; line-height:1.25;'>
             Which schools need our attention most?
         </div>
-        <div style='font-size:0.92rem; color:#94A3B8; margin-top:12px; max-width:680px; line-height:1.6;'>
-            Every student in this network has been scored by our model.
-            Below you can see — by school — how many students are likely to miss too many days
-            this year, so you can direct counselors and family liaisons where they're needed most.
+        <div style='font-size:0.92rem; color:#B8CFDF; margin-top:12px; max-width:680px; line-height:1.6;'>
+            Every enrolled CPS student has been scored by our model across all 646 official schools.
+            Use the filters below to see — by governance type and school — how many students are likely
+            to miss too many days this year, so you can direct resources where they are needed most.
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -970,7 +995,7 @@ elif page == "Network & District View":
                         text-transform:uppercase; letter-spacing:0.05em;'>
                 At this setting
             </div>
-            <div style='font-size:1.6rem; font-weight:800; color:#0A1628; margin-top:4px;'>
+            <div style='font-size:1.6rem; font-weight:800; color:#003057; margin-top:4px;'>
                 {pct_flagged:.0%} of students
             </div>
             <div style='font-size:0.82rem; color:#475569; margin-top:2px;'>
@@ -991,7 +1016,7 @@ elif page == "Network & District View":
     kc1, kc2, kc3, kc4 = st.columns(4)
     cards = [
         (kc1, f"{n_total:,}",       "Students in this view",
-         f"{view_label}",                                                  "#0A1628"),
+         f"{view_label}",                                                  "#003057"),
         (kc2, f"{n_atrisk:,}",      "Likely to miss too many days",
          "Need a counselor or family check-in this year",                  "#EF4444" if pct_risk > 0.35 else "#F59E0B"),
         (kc3, f"{n_urgent:,}",      "Need urgent attention",
