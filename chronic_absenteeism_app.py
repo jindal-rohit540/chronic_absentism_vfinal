@@ -861,598 +861,204 @@ elif page == "Student Risk Predictor":
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# PAGE 3 — NETWORK & DISTRICT VIEW
+# PAGE 3 — NETWORK & DISTRICT VIEW  (real predictions from predictions_by_network.csv)
 # ══════════════════════════════════════════════════════════════════════════════
 elif page == "Network & District View":
 
-    # ── Load model (reuse cache) ───────────────────────────────────────────────
-    @st.cache_resource
-    def load_artifact_p3():
-        return joblib.load("Built-in/chronic_absenteeism_xgb.pkl")
-
-    _art3           = load_artifact_p3()
-    _model3         = _art3["model"]
-    _le3            = _art3["label_encoders"]
-    _lm3            = _art3["label_mappings"]
-    _all_cols3      = _art3["all_feature_cols"]
-    THRESHOLD3      = _art3["best_threshold"]
-
+    # ── Load predictions CSV ───────────────────────────────────────────────────
     @st.cache_data
-    def load_schools_p3():
-        df = pd.read_csv("Built-in/dim_schools.csv")
-        df["NETWORK"] = df["NETWORK"].fillna("No Network")
-        return df
+    def load_predictions():
+        return pd.read_csv("Built-in/predictions_by_network.csv")
 
-    df_schools3 = load_schools_p3()
+    PRED_FILE = "Built-in/predictions_by_network.csv"
 
-    # ── Synthetic cohort generator ─────────────────────────────────────────────
-    # Generates a representative population seeded by scope string so it is
-    # reproducible within a session but distinct per school/network/district.
-    @st.cache_data(show_spinner=False)
-    def build_cohort(scope_key: str, n: int = 400) -> pd.DataFrame:
-        rng = np.random.default_rng(abs(hash(scope_key)) % (2**31))
+    import os as _os
+    if not _os.path.exists(PRED_FILE):
+        st.markdown("""
+        <div style='background:#FFFBEB; border:1px solid #FCD34D; border-radius:12px;
+                    padding:28px 32px; margin:40px 0;'>
+            <div style='font-size:1.1rem; font-weight:700; color:#92400E; margin-bottom:8px;'>
+                📂 Predictions file not found
+            </div>
+            <div style='font-size:0.88rem; color:#78350F; line-height:1.7;'>
+                Run <b>fabric_generate_predictions.py</b> in your Fabric notebook to generate
+                <code>predictions_by_network.csv</code>, then place it in the <code>Built-in/</code> folder.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        st.stop()
 
-        # Attendance history — mix of good and at-risk students
-        att_t1 = np.clip(rng.beta(8, 2, n), 0, 1)       # skewed toward high attendance
-        att_t2 = np.clip(rng.beta(8, 2, n), 0, 1)
-
-        # Socioeconomic / support flags (correlated with attendance)
-        at_risk_weight = np.where(att_t1 < 0.85, 0.6, 0.2)
-        homeless  = rng.binomial(1, np.clip(at_risk_weight * 0.3, 0, 1), n)
-        medicaid  = rng.binomial(1, np.clip(at_risk_weight * 0.7 + 0.2, 0, 1), n)
-        sped      = rng.binomial(1, 0.15,  n)
-        s504      = rng.binomial(1, 0.05,  n)
-
-        # Mobility
-        lifetime_tr = rng.integers(0, 5, n)
-        tr_this_yr  = rng.integers(0, 2, n)
-
-        # Health
-        chronic_count = rng.integers(0, 3, n)
-        dental_ok  = rng.binomial(1, 0.72, n)
-        vision_ok  = rng.binomial(1, 0.78, n)
-        immun_ok   = rng.binomial(1, 0.90, n)
-
-        # Categorical
-        grades = ["PK","K","01","02","03","04","05","06","07","08","09","10","11","12"]
-        grade_arr  = rng.choice(grades, n)
-        gender_arr = rng.choice(["F", "M"], n)
-        race_arr   = rng.choice(
-            ["Black or African American", "Hispanic", "White", "Asian", "Multi", "--"],
-            n, p=[0.36, 0.47, 0.09, 0.04, 0.03, 0.01]
-        )
-
-        rows = []
-        for i in range(n):
-            a1  = float(att_t1[i])
-            a2  = float(att_t2[i])
-            num = {
-                "covid_year":                    0,
-                "attendance_rate_t_minus_1":     a1,
-                "attendance_rate_t_minus_2":     a2,
-                "tardy_total_t_minus_1":         0,
-                "excused_absences_t_minus_1":    0,
-                "STUDENT_SPECIAL_ED_INDICATOR":  int(sped[i]),
-                "STUDENT_HOMELESS_INDICATOR":    int(homeless[i]),
-                "STUDENT_FOODSERVICE_INDICATOR": 0,
-                "STUDENT_504_INDICATOR":         int(s504[i]),
-                "chronic_condition_count":       int(chronic_count[i]),
-                "has_asthma":                    0,
-                "has_diabetes":                  0,
-                "has_allergy":                   0,
-                "has_seizure":                   0,
-                "has_chronic_condition":         1 if chronic_count[i] > 0 else 0,
-                "immunizations_compliant":       int(immun_ok[i]),
-                "health_exams_compliant":        1,
-                "dental_compliant":              int(dental_ok[i]),
-                "vision_compliant":              int(vision_ok[i]),
-                "medicaid_indicator":            int(medicaid[i]),
-                "school_transfers_this_year":    int(tr_this_yr[i]),
-                "transferred_this_year":         1 if tr_this_yr[i] > 0 else 0,
-                "lifetime_school_transfers":     int(lifetime_tr[i]),
-                "was_chronic_last_year":         1 if a1 < 0.90 else 0,
-            }
-            cat_raw = {
-                "STUDENT_GENDER":             gender_arr[i],
-                "STUDENT_RACE":               race_arr[i],
-                "STUDENT_ETHNICITY":          "Unknown",
-                "STUDENT_LANGUAGE":           "English",
-                "STUDENT_CURRENT_GRADE_CODE": grade_arr[i],
-                "ENROLLMENT_HISTORY_STATUS":  "Active",
-            }
-            cat_enc = {}
-            for col, val in cat_raw.items():
-                le = _le3[col]
-                cat_enc[col] = le.transform([val])[0] if val in le.classes_ \
-                               else le.transform(["Unknown"])[0]
-            rows.append({**num, **cat_enc})
-
-        df = pd.DataFrame(rows)[_all_cols3]
-        probs = _model3.predict_proba(df)[:, 1]
-        out = pd.DataFrame(rows)
-        out["prob"] = probs
-        out["att_t1"] = att_t1
-        out["att_t2"] = att_t2
-        out["homeless"] = homeless
-        out["medicaid"] = medicaid
-        out["sped"] = sped
-        out["s504"] = s504
-        out["dental_ok"] = dental_ok
-        out["vision_ok"] = vision_ok
-        out["immun_ok"] = immun_ok
-        out["chronic_count"] = chronic_count
-        out["lifetime_tr"] = lifetime_tr
-        out["tr_this_yr"] = tr_this_yr
-        return out
-
-    def apply_interventions(cohort: pd.DataFrame, interventions: dict) -> np.ndarray:
-        """Re-score cohort with intervention adjustments applied."""
-        df = pd.DataFrame()
-        rows = []
-        for _, r in cohort.iterrows():
-            a1 = float(r["att_t1"])
-            a2 = float(r["att_t2"])
-            dental  = min(1, int(r["dental_ok"])  + interventions.get("dental_boost", 0))
-            vision  = min(1, int(r["vision_ok"])  + interventions.get("vision_boost", 0))
-            immun   = min(1, int(r["immun_ok"])   + interventions.get("immun_boost", 0))
-            lt_adj  = max(0, int(r["lifetime_tr"]) - interventions.get("transfer_reduction", 0))
-            homeless_adj = max(0, int(r["homeless"]) - interventions.get("homeless_reduction", 0))
-
-            num = {
-                "covid_year":                    0,
-                "attendance_rate_t_minus_1":     a1,
-                "attendance_rate_t_minus_2":     a2,
-                "tardy_total_t_minus_1":         0,
-                "excused_absences_t_minus_1":    0,
-                "STUDENT_SPECIAL_ED_INDICATOR":  int(r["sped"]),
-                "STUDENT_HOMELESS_INDICATOR":    homeless_adj,
-                "STUDENT_FOODSERVICE_INDICATOR": 0,
-                "STUDENT_504_INDICATOR":         int(r["s504"]),
-                "chronic_condition_count":       int(r["chronic_count"]),
-                "has_asthma":                    0,
-                "has_diabetes":                  0,
-                "has_allergy":                   0,
-                "has_seizure":                   0,
-                "has_chronic_condition":         1 if r["chronic_count"] > 0 else 0,
-                "immunizations_compliant":       immun,
-                "health_exams_compliant":        1,
-                "dental_compliant":              dental,
-                "vision_compliant":              vision,
-                "medicaid_indicator":            int(r["medicaid"]),
-                "school_transfers_this_year":    int(r["tr_this_yr"]),
-                "transferred_this_year":         1 if r["tr_this_yr"] > 0 else 0,
-                "lifetime_school_transfers":     lt_adj,
-                "was_chronic_last_year":         1 if a1 < 0.90 else 0,
-            }
-            # Categorical columns come directly from cached cohort row
-            cat_enc = {c: int(r[c]) for c in _all_cols3 if c not in num}
-            rows.append({**num, **cat_enc})
-
-        X = pd.DataFrame(rows)[_all_cols3]
-        return _model3.predict_proba(X)[:, 1]
+    df_pred = load_predictions()
+    THRESHOLD_DISPLAY = 0.40
 
     # ── Header ────────────────────────────────────────────────────────────────
     st.markdown("""
     <div style='padding: 8px 0 20px 0;'>
         <div style='font-size:1.6rem; font-weight:700; color:#0A1628;'>Network & District Risk View</div>
         <div style='font-size:0.88rem; color:#475569; margin-top:4px; max-width:720px;'>
-            Explore how chronic absenteeism risk is distributed across a school, network, or the entire
-            district — and model the impact of targeted interventions before the year begins.
+            Real predictions from the XGBoost model — scored at student level,
+            aggregated to school and network for leadership review.
         </div>
     </div>
     """, unsafe_allow_html=True)
 
     st.markdown("""
     <div class='info-box'>
-        📌 <b>How this works:</b> A representative student population is simulated for each scope using
-        the same predictive model. Use the <b>intervention levers</b> below to see how district-level
-        actions (e.g. improving dental compliance, stabilizing housing) shift the overall risk landscape.
+        📌 <b>Real data:</b> These predictions are generated by running the trained model against
+        actual student records from the lakehouse. Select a network to see school-level risk counts
+        and drill into individual at-risk students.
     </div>
     """, unsafe_allow_html=True)
 
-    # Demo networks and their schools (static subset for demo clarity)
-    DEMO_NETWORKS = {
-        "Network 1":  ["ALBANY PARK", "BATEMAN", "BELDING", "CHASE", "DISNEY MAGNET"],
-        "Network 4":  ["ALCOTT ES", "AUDUBON", "BLAINE", "BURLEY", "CHASE"],
-        "Network 10": ["ASHBURN", "AZUELA", "BEASLEY", "BRIGHTON PARK", "CARDENAS"],
-        "Network 13": ["ADDAMS", "ALDRIDGE", "BARNARD", "BEIDLER", "BOND"],
-        "Charter":    ["ACERO - BRIGHTON PARK", "ACERO - CISNEROS", "ACERO - CLEMENTE", "ACERO - DE LAS CASAS", "ACERO - GARCIA"],
-    }
+    # ── Network selector ──────────────────────────────────────────────────────
+    available_networks = sorted(df_pred["NETWORK"].dropna().unique().tolist())
 
-    # ── Scope selector ────────────────────────────────────────────────────────
-    sc1, sc2, sc3 = st.columns([1, 1.2, 1.5])
-    with sc1:
-        scope_level = st.selectbox(
-            "View Level",
-            ["Entire District (CPS)", "By Network", "By School"],
-            help="Choose whether to view all of CPS, a specific network, or a single school.",
-        )
-    with sc2:
-        if scope_level == "By Network":
-            selected_network = st.selectbox("Select Network", list(DEMO_NETWORKS.keys()))
-            scope_key   = f"network::{selected_network}"
-            scope_label = selected_network
-        elif scope_level == "By School":
-            sel_net = st.selectbox("Network", list(DEMO_NETWORKS.keys()), key="scope_net")
-            with sc3:
-                sel_school = st.selectbox("School", DEMO_NETWORKS[sel_net])
-            scope_key   = f"school::{sel_school}"
-            scope_label = sel_school
-        else:
-            scope_key   = "district::CPS"
-            scope_label = "Chicago Public Schools (District)"
-            st.markdown(
-                "<div style='padding-top:28px; font-size:0.85rem; color:#64748B;'>"
-                "All networks &amp; schools combined</div>",
-                unsafe_allow_html=True,
-            )
+    sel_col1, sel_col2 = st.columns([1, 2])
+    with sel_col1:
+        view_level = st.selectbox("View Level", ["By Network", "By School"])
+    with sel_col2:
+        selected_network = st.selectbox("Select Network", available_networks)
 
-    n_students = 600 if scope_level == "Entire District (CPS)" else (300 if scope_level == "By Network" else 150)
+    network_df = df_pred[df_pred["NETWORK"] == selected_network]
 
-    cohort = build_cohort(scope_key, n=n_students)
-
-    st.markdown("<hr class='thin'/>", unsafe_allow_html=True)
-
-    # ── Intervention levers ───────────────────────────────────────────────────
-    st.markdown("<div class='section-header'>Intervention Scenario Modeling</div>", unsafe_allow_html=True)
-    st.markdown("""
-    <div class='section-sub'>
-        Adjust these levers to model the effect of targeted district programs on overall risk.
-        The risk distribution updates instantly.
-    </div>
-    """, unsafe_allow_html=True)
-
-    iv1, iv2, iv3, iv4 = st.columns(4)
-    with iv1:
-        dental_boost = st.slider(
-            "Improve Dental Compliance",
-            min_value=0, max_value=1, value=0,
-            help="Set to 1 to make all non-compliant students compliant — models impact of a district dental program.",
-            format="%d (bring all to compliant)" if False else "%d",
-        )
-        st.caption("0 = no change · 1 = all students compliant")
-    with iv2:
-        vision_boost = st.slider(
-            "Improve Vision Screening",
-            min_value=0, max_value=1, value=0,
-            help="Set to 1 to make all students vision-screened.",
-        )
-        st.caption("0 = no change · 1 = all students screened")
-    with iv3:
-        transfer_reduction = st.slider(
-            "Reduce School Transfers",
-            min_value=0, max_value=3, value=0,
-            help="Reduce each student's lifetime transfer count by this amount — models school stabilization programs.",
-        )
-        st.caption("Transfers reduced per student (max 3)")
-    with iv4:
-        homeless_reduction = st.slider(
-            "Housing Stabilization",
-            min_value=0, max_value=1, value=0,
-            help="Set to 1 to model the effect of resolving housing instability for all currently homeless students.",
-        )
-        st.caption("0 = no change · 1 = all housed")
-
-    interventions = {
-        "dental_boost":        dental_boost,
-        "vision_boost":        vision_boost,
-        "transfer_reduction":  transfer_reduction,
-        "homeless_reduction":  homeless_reduction,
-    }
-
-    any_intervention = any(v > 0 for v in interventions.values())
-
-    # Score baseline and intervention
-    baseline_probs = cohort["prob"].values
-    if any_intervention:
-        with st.spinner("Re-scoring population with interventions..."):
-            intervened_probs = apply_interventions(cohort, interventions)
+    if view_level == "By School":
+        available_schools = sorted(network_df["SCHOOL_NAME"].dropna().unique().tolist())
+        selected_school   = st.selectbox("Select School", available_schools)
+        view_df    = network_df[network_df["SCHOOL_NAME"] == selected_school]
+        view_label = selected_school
     else:
-        intervened_probs = baseline_probs
+        view_df    = network_df
+        view_label = selected_network
 
     st.markdown("<hr class='thin'/>", unsafe_allow_html=True)
 
-    # ── KPI summary ───────────────────────────────────────────────────────────
-    base_at_risk   = float((baseline_probs >= THRESHOLD3).mean())
-    inter_at_risk  = float((intervened_probs >= THRESHOLD3).mean())
-    base_avg       = float(baseline_probs.mean())
-    inter_avg      = float(intervened_probs.mean())
-    delta_pct      = inter_at_risk - base_at_risk
-    delta_avg      = inter_avg - base_avg
+    # ── Network KPI cards ─────────────────────────────────────────────────────
+    n_total   = len(view_df)
+    n_atrisk  = int((view_df["risk_score"] >= THRESHOLD_DISPLAY).sum())
+    n_high    = int((view_df["risk_score"] >= 0.60).sum())
+    n_low     = n_total - n_atrisk
+    pct_risk  = n_atrisk / n_total if n_total else 0
 
     kc1, kc2, kc3, kc4 = st.columns(4)
-
-    def _kpi_card(col, value, label, sub, color="#0A1628", delta=None):
-        delta_html = ""
-        if delta is not None and abs(delta) > 0.0001:
-            sign  = "▼" if delta < 0 else "▲"
-            dcol  = "#22C55E" if delta < 0 else "#EF4444"
-            delta_html = (
-                f"<div style='font-size:0.78rem; color:{dcol}; font-weight:600; margin-top:4px;'>"
-                f"{sign} {abs(delta):.1%} vs. baseline</div>"
-            )
+    kpis = [
+        (kc1, str(n_total),             "Total Students",         view_label[:30], "#0A1628"),
+        (kc2, str(n_atrisk),            "At-Risk Students",       "Risk score ≥ 40%", "#EF4444" if pct_risk > 0.35 else "#F59E0B"),
+        (kc3, f"{pct_risk:.0%}",        "At-Risk Rate",           "Share flagged for outreach", "#EF4444" if pct_risk > 0.35 else "#F59E0B"),
+        (kc4, str(n_high),              "High Risk (≥60%)",       "Priority outreach needed", "#DC2626"),
+    ]
+    for col, val, lbl, sub, color in kpis:
         with col:
             st.markdown(f"""
             <div class='metric-card'>
-                <div class='metric-value' style='color:{color};'>{value}</div>
-                <div class='metric-label'>{label}</div>
+                <div class='metric-value' style='color:{color};'>{val}</div>
+                <div class='metric-label'>{lbl}</div>
                 <div class='metric-sub'>{sub}</div>
-                {delta_html}
             </div>
             """, unsafe_allow_html=True)
 
-    _kpi_card(kc1, f"{n_students:,}", "Students Modeled",
-              f"Representative cohort for {scope_label[:30]}")
-    _kpi_card(kc2, f"{base_at_risk:.0%}", "At-Risk (Baseline)",
-              "Score ≥ 40% — flagged for outreach",
-              color="#EF4444" if base_at_risk > 0.4 else "#F59E0B")
-    _kpi_card(kc3, f"{inter_at_risk:.0%}", "At-Risk (With Interventions)",
-              "After applying your scenario levers",
-              color="#EF4444" if inter_at_risk > 0.4 else "#22C55E",
-              delta=delta_pct if any_intervention else None)
-    _kpi_card(kc4, f"{inter_avg:.0%}", "Avg Risk Score",
-              "Mean probability across all students",
-              delta=delta_avg if any_intervention else None)
-
     st.markdown("<hr class='thin'/>", unsafe_allow_html=True)
 
-    # ── School-level breakdown (shown only when a network is selected) ─────────
-    if scope_level == "By Network":
+    # ── School-level breakdown (only in network view) ─────────────────────────
+    if view_level == "By Network":
         st.markdown("<div class='section-header'>School-Level Risk Breakdown</div>", unsafe_allow_html=True)
-        st.markdown(
-            "<div class='section-sub'>At-risk student counts per school in this network</div>",
-            unsafe_allow_html=True,
+        st.markdown("<div class='section-sub'>At-risk student counts for each school in this network</div>",
+                    unsafe_allow_html=True)
+
+        school_summary = (
+            network_df.groupby("SCHOOL_NAME")
+            .apply(lambda g: pd.Series({
+                "total":   len(g),
+                "atrisk":  int((g["risk_score"] >= THRESHOLD_DISPLAY).sum()),
+                "high":    int((g["risk_score"] >= 0.60).sum()),
+            }))
+            .reset_index()
         )
+        school_summary["rate"] = school_summary["atrisk"] / school_summary["total"]
+        school_summary = school_summary.sort_values("atrisk", ascending=False)
 
-        school_rows = []
-        for school in DEMO_NETWORKS[selected_network]:
-            sc_cohort = build_cohort(f"school::{school}", n=150)
-            sc_probs  = sc_cohort["prob"].values
-            n_total   = len(sc_probs)
-            n_atrisk  = int((sc_probs >= THRESHOLD3).sum())
-            n_high    = int((sc_probs >= 0.60).sum())
-            school_rows.append({
-                "School":              school,
-                "Total Students":      n_total,
-                "At-Risk (≥40%)":      n_atrisk,
-                "High Risk (≥60%)":    n_high,
-                "At-Risk Rate":        n_atrisk / n_total,
-            })
-
-        school_df = pd.DataFrame(school_rows).sort_values("At-Risk (≥40%)", ascending=False)
-
-        # Render as styled cards
-        for _, row in school_df.iterrows():
-            rate     = row["At-Risk Rate"]
-            bar_pct  = int(rate * 100)
-            bar_col  = "#EF4444" if rate >= 0.40 else ("#F59E0B" if rate >= 0.25 else "#22C55E")
+        for _, row in school_summary.iterrows():
+            bar_pct = int(row["rate"] * 100)
+            bar_col = "#EF4444" if row["rate"] >= 0.40 else ("#F59E0B" if row["rate"] >= 0.25 else "#22C55E")
             st.markdown(f"""
             <div style='background:#FFFFFF; border:1px solid #E2E8F0; border-radius:10px;
                         padding:14px 20px; margin-bottom:8px; display:flex;
-                        align-items:center; justify-content:space-between; gap:16px;'>
-                <div style='min-width:220px; font-weight:600; font-size:0.88rem; color:#1E293B;'>
-                    {row["School"]}
+                        align-items:center; gap:16px;'>
+                <div style='min-width:240px; font-weight:600; font-size:0.88rem; color:#1E293B;'>
+                    {row["SCHOOL_NAME"]}
                 </div>
                 <div style='flex:1; background:#F1F5F9; border-radius:6px; height:10px; overflow:hidden;'>
                     <div style='width:{bar_pct}%; background:{bar_col}; height:10px; border-radius:6px;'></div>
                 </div>
-                <div style='min-width:80px; text-align:right; font-size:0.82rem; color:#64748B;'>
-                    <b style='color:{bar_col};'>{row["At-Risk (≥40%)"]:,}</b> / {row["Total Students"]:,} at risk
+                <div style='min-width:120px; text-align:right; font-size:0.82rem; color:#64748B;'>
+                    <b style='color:{bar_col};'>{int(row["atrisk"]):,}</b> / {int(row["total"]):,} at risk
                 </div>
-                <div style='min-width:60px; text-align:right; font-size:0.82rem;
-                            font-weight:700; color:{bar_col};'>{bar_pct}%</div>
-                <div style='min-width:100px; text-align:right; font-size:0.78rem; color:#EF4444;'>
-                    🔴 {row["High Risk (≥60%)"]} high risk
+                <div style='min-width:50px; text-align:right; font-weight:700;
+                            font-size:0.85rem; color:{bar_col};'>{bar_pct}%</div>
+                <div style='min-width:110px; text-align:right; font-size:0.78rem; color:#EF4444;'>
+                    🔴 {int(row["high"])} high risk
                 </div>
-                <a href='#' style='font-size:0.76rem; color:#3B82F6; text-decoration:none;
-                                   white-space:nowrap; opacity:0.6; cursor:not-allowed;'
-                   title='Coming soon'>⬇ Download Report</a>
             </div>
             """, unsafe_allow_html=True)
 
         st.markdown("<hr class='thin'/>", unsafe_allow_html=True)
 
-    # ── Distribution chart ────────────────────────────────────────────────────
-    chart_l, chart_r = st.columns([1.4, 1], gap="large")
+    # ── At-risk student list ───────────────────────────────────────────────────
+    st.markdown("<div class='section-header'>At-Risk Students</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-sub'>Individual students flagged for outreach — anonymized IDs</div>",
+                unsafe_allow_html=True)
 
-    with chart_l:
-        st.markdown("<div class='section-header'>Risk Score Distribution</div>", unsafe_allow_html=True)
-        st.markdown(
-            "<div class='section-sub'>How students are spread across the risk spectrum</div>",
-            unsafe_allow_html=True,
+    atrisk_df = (
+        view_df[view_df["risk_score"] >= THRESHOLD_DISPLAY]
+        .sort_values("risk_score", ascending=False)
+        .reset_index(drop=True)
+    )
+
+    if atrisk_df.empty:
+        st.info("No at-risk students found for this selection.")
+    else:
+        tier_color_map = {"High Risk": "#EF4444", "Elevated Risk": "#F59E0B", "Low Risk": "#22C55E"}
+
+        display_cols = ["student_id", "SCHOOL_NAME", "grade", "gender", "race",
+                        "prior_yr_attendance", "risk_score", "risk_tier"]
+        display_cols = [c for c in display_cols if c in atrisk_df.columns]
+
+        rename_map = {
+            "student_id":          "Student ID",
+            "SCHOOL_NAME":         "School",
+            "grade":               "Grade",
+            "gender":              "Gender",
+            "race":                "Race",
+            "prior_yr_attendance": "Prior Yr Attendance",
+            "risk_score":          "Risk Score",
+            "risk_tier":           "Risk Tier",
+        }
+
+        table_df = atrisk_df[display_cols].rename(columns=rename_map).copy()
+        table_df["Prior Yr Attendance"] = table_df["Prior Yr Attendance"].apply(lambda x: f"{x:.0%}")
+        table_df["Risk Score"]          = table_df["Risk Score"].apply(lambda x: f"{x:.0%}")
+
+        st.dataframe(
+            table_df,
+            use_container_width=True,
+            hide_index=True,
+            height=min(400, 40 + len(table_df) * 35),
         )
 
-        bins = np.linspace(0, 1, 21)
-        base_counts, _  = np.histogram(baseline_probs, bins=bins)
-        inter_counts, _ = np.histogram(intervened_probs, bins=bins)
-        bin_centers = (bins[:-1] + bins[1:]) / 2
-        bin_labels  = [f"{int(b*100)}%" for b in bin_centers]
-
-        bar_colors_base = [
-            "#EF4444" if b >= 0.60 else ("#F59E0B" if b >= THRESHOLD3 else "#22C55E")
-            for b in bin_centers
-        ]
-
-        fig_dist = go.Figure()
-        fig_dist.add_trace(go.Bar(
-            x=bin_labels,
-            y=base_counts,
-            name="Baseline",
-            marker_color=bar_colors_base,
-            opacity=0.85,
-        ))
-        if any_intervention:
-            fig_dist.add_trace(go.Bar(
-                x=bin_labels,
-                y=inter_counts,
-                name="With Interventions",
-                marker_color="#3B82F6",
-                opacity=0.55,
-            ))
-        threshold_label = bin_labels[np.searchsorted(bin_centers, THRESHOLD3)]
-        fig_dist.add_shape(
-            type="line",
-            x0=threshold_label, x1=threshold_label,
-            y0=0, y1=1,
-            xref="x", yref="paper",
-            line=dict(dash="dash", color="#0A1628", width=1.5),
-        )
-        fig_dist.add_annotation(
-            x=threshold_label, y=1,
-            xref="x", yref="paper",
-            text="At-Risk Threshold (40%)",
-            showarrow=False,
-            xanchor="left",
-            font=dict(size=10, color="#0A1628"),
-        )
-        fig_dist.update_layout(
-            height=320,
-            margin=dict(l=0, r=10, t=10, b=30),
-            paper_bgcolor="white",
-            plot_bgcolor="white",
-            barmode="overlay",
-            xaxis=dict(title="Risk Score", tickangle=-30, tickfont=dict(size=9)),
-            yaxis=dict(title="Number of Students", showgrid=True, gridcolor="#F1F5F9"),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1,
-                        font=dict(size=10)),
-            font=dict(family="Inter"),
-        )
-        st.plotly_chart(fig_dist, use_container_width=True)
-
-    with chart_r:
-        st.markdown("<div class='section-header'>Risk Tier Breakdown</div>", unsafe_allow_html=True)
-        st.markdown(
-            "<div class='section-sub'>Students by risk category — baseline vs. scenario</div>",
-            unsafe_allow_html=True,
+        csv_bytes = atrisk_df[display_cols].rename(columns=rename_map).to_csv(index=False).encode()
+        st.download_button(
+            label=f"⬇ Download At-Risk List — {view_label}",
+            data=csv_bytes,
+            file_name=f"atrisk_{view_label.replace(' ', '_')}.csv",
+            mime="text/csv",
         )
 
-        def tier_counts(probs):
-            return {
-                "Low Risk (<40%)":      int((probs < THRESHOLD3).sum()),
-                "Elevated (40–60%)":   int(((probs >= THRESHOLD3) & (probs < 0.60)).sum()),
-                "High Risk (≥60%)":    int((probs >= 0.60).sum()),
-            }
-
-        tc_base  = tier_counts(baseline_probs)
-        tc_inter = tier_counts(intervened_probs)
-
-        tier_labels = list(tc_base.keys())
-        tier_colors = ["#22C55E", "#F59E0B", "#EF4444"]
-
-        fig_pie = go.Figure()
-        fig_pie.add_trace(go.Pie(
-            labels=tier_labels,
-            values=list(tc_inter.values()) if any_intervention else list(tc_base.values()),
-            marker_colors=tier_colors,
-            hole=0.48,
-            textfont=dict(size=11),
-            textinfo="label+percent",
-        ))
-        fig_pie.update_layout(
-            height=260,
-            margin=dict(l=0, r=0, t=10, b=10),
-            paper_bgcolor="white",
-            showlegend=False,
-            font=dict(family="Inter"),
-            annotations=[dict(
-                text="<b>Risk<br>Mix</b>",
-                x=0.5, y=0.5, font_size=13, showarrow=False,
-            )],
-        )
-        st.plotly_chart(fig_pie, use_container_width=True)
-
-        for label, color in zip(tier_labels, tier_colors):
-            b_n = tc_base[label]
-            i_n = tc_inter[label]
-            delta_n = i_n - b_n
-            delta_str = ""
-            if any_intervention and delta_n != 0:
-                sign = "▼" if delta_n < 0 else "▲"
-                dcol = "#22C55E" if (delta_n < 0 and "High" in label) or \
-                                    (delta_n < 0 and "Elevated" in label) or \
-                                    (delta_n > 0 and "Low" in label) else "#EF4444"
-                delta_str = (
-                    f"<span style='color:{dcol}; font-size:0.74rem; font-weight:600;'>"
-                    f"  {sign}{abs(delta_n)}</span>"
-                )
-            st.markdown(
-                f"<div style='display:flex; align-items:center; gap:8px; margin-bottom:6px;'>"
-                f"<div style='width:12px; height:12px; background:{color}; border-radius:3px;'></div>"
-                f"<span style='font-size:0.82rem; color:#374151;'>{label}: "
-                f"<b>{i_n if any_intervention else b_n}</b> students{delta_str}</span>"
-                f"</div>",
-                unsafe_allow_html=True,
-            )
-
-    st.markdown("<hr class='thin'/>", unsafe_allow_html=True)
-
-    # ── Intervention impact summary ───────────────────────────────────────────
-    if any_intervention:
-        students_moved = int(
-            ((baseline_probs >= THRESHOLD3) & (intervened_probs < THRESHOLD3)).sum()
-        )
-        st.markdown("<div class='section-header'>Intervention Impact Summary</div>", unsafe_allow_html=True)
-        ic1, ic2, ic3 = st.columns(3)
-        with ic1:
-            st.markdown(f"""
-            <div style='background:#F0FDF4; border:1px solid #86EFAC; border-radius:12px;
-                        padding:18px 20px; text-align:center;'>
-                <div style='font-size:2rem; font-weight:800; color:#16A34A;'>{students_moved}</div>
-                <div style='font-size:0.78rem; font-weight:600; color:#15803D;
-                            text-transform:uppercase; letter-spacing:0.05em; margin-top:4px;'>
-                    Students Moved Off At-Risk List
-                </div>
-                <div style='font-size:0.73rem; color:#64748B; margin-top:4px;'>
-                    Would drop below the 40% threshold with these interventions
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-        with ic2:
-            avg_improvement = base_avg - inter_avg
-            st.markdown(f"""
-            <div style='background:#EFF6FF; border:1px solid #93C5FD; border-radius:12px;
-                        padding:18px 20px; text-align:center;'>
-                <div style='font-size:2rem; font-weight:800; color:#1D4ED8;'>
-                    {avg_improvement:.1%}
-                </div>
-                <div style='font-size:0.78rem; font-weight:600; color:#1E40AF;
-                            text-transform:uppercase; letter-spacing:0.05em; margin-top:4px;'>
-                    Average Risk Reduction
-                </div>
-                <div style='font-size:0.73rem; color:#64748B; margin-top:4px;'>
-                    Mean probability drop across all students in this scope
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-        with ic3:
-            school_days = 180
-            days_recovered = students_moved * int(school_days * 0.10)
-            st.markdown(f"""
-            <div style='background:#FFFBEB; border:1px solid #FCD34D; border-radius:12px;
-                        padding:18px 20px; text-align:center;'>
-                <div style='font-size:2rem; font-weight:800; color:#B45309;'>
-                    ~{days_recovered:,}
-                </div>
-                <div style='font-size:0.78rem; font-weight:600; color:#92400E;
-                            text-transform:uppercase; letter-spacing:0.05em; margin-top:4px;'>
-                    Attendance Days Potentially Recovered
-                </div>
-                <div style='font-size:0.73rem; color:#64748B; margin-top:4px;'>
-                    Estimated from students who cross the risk threshold
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-
-    # ── Explainer footer ──────────────────────────────────────────────────────
     st.markdown("<hr class='thin'/>", unsafe_allow_html=True)
     st.markdown("""
     <div style='font-size:0.76rem; color:#94A3B8; line-height:1.7;'>
-        <b>Methodology note:</b> This view generates a representative synthetic cohort for the selected scope
-        using the same XGBoost model trained on 529,405 CPS students. Student profiles are sampled to reflect
-        realistic district-level distributions of attendance history, demographics, health indicators, and
-        mobility patterns. Intervention levers neutralize specific risk factors for the modeled population
-        and re-score them through the same model — showing how structural programs shift the aggregate
-        risk distribution. This is a planning and demonstration tool; operational scoring should use
-        actual student records.
+        <b>Methodology note:</b> Predictions generated by the XGBoost model trained on 529,405 CPS students
+        (AY 2018–2026). Student IDs are anonymized for this view. A score ≥ 40% indicates at-risk status
+        based on the model's best F1 threshold tested against 331,000 held-out students.
     </div>
     """, unsafe_allow_html=True)
+
+
