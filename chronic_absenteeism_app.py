@@ -134,14 +134,16 @@ div[data-testid="stNumberInput"] > div { border-radius: 6px !important; }
 
 # ── Navigation ────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.image("Built-in/cps_logo.jpg", use_container_width=True)
+    st.markdown("<div style='padding:16px 20px 0 20px;'>", unsafe_allow_html=True)
+    st.image("Built-in/cps_logo.jpg", width=180)
     st.markdown("""
-    <div style='text-align:center; padding:8px 16px 14px 16px;'>
-        <div style='font-size:0.65rem; font-weight:700; letter-spacing:0.14em;
-                    color:#C8973A; text-transform:uppercase; margin-bottom:4px;'>
+    </div>
+    <div style='text-align:center; padding:4px 16px 14px 16px;'>
+        <div style='font-size:0.62rem; font-weight:700; letter-spacing:0.12em;
+                    color:#C8973A; text-transform:uppercase; margin-bottom:3px;'>
             Enterprise Analytics &amp; Architecture
         </div>
-        <div style='font-size:1rem; font-weight:800; color:#FFFFFF; line-height:1.3;'>
+        <div style='font-size:0.88rem; font-weight:800; color:#FFFFFF; line-height:1.3;'>
             Chronic Absenteeism<br>Early Warning System
         </div>
     </div>
@@ -158,14 +160,6 @@ with st.sidebar:
         label_visibility="collapsed",
     )
 
-    st.markdown("""
-    <hr style='border-color:#C8973A; margin:20px 0 12px 0; opacity:0.3;'/>
-    <div style='font-size:0.7rem; color:#8FA8C0; text-align:center; line-height:1.8;'>
-        Trained on <b style='color:#C8973A;'>529,405 students</b><br>
-        Accuracy: <b style='color:#C8973A;'>80%</b> on unseen data<br>
-        Academic Years 2018 – 2026
-    </div>
-    """, unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE 1 — EXECUTIVE SUMMARY
@@ -175,20 +169,15 @@ if page == "📊  District Overview":
     # ── Hero header ───────────────────────────────────────────────────────────
     st.markdown("""
     <div style='background:linear-gradient(135deg,#003057 0%,#00497a 100%);
-                border-radius:12px; padding:36px 40px; margin-bottom:28px;
-                border-left:6px solid #C8973A;'>
-        <div style='font-size:0.72rem; font-weight:700; letter-spacing:0.14em;
-                    color:#C8973A; text-transform:uppercase; margin-bottom:10px;'>
-            Chicago Public Schools · Data &amp; Analytics · Early Warning System
+                border-radius:12px; padding:40px 48px; margin-bottom:28px;
+                border-left:6px solid #C8973A; width:100%;'>
+        <div style='font-size:2.2rem; font-weight:800; color:#FFFFFF; line-height:1.2; margin-bottom:16px;'>
+            Predicting Student Absenteeism Before It Becomes a Crisis
         </div>
-        <div style='font-size:2rem; font-weight:800; color:#FFFFFF; line-height:1.25;
-                    max-width:700px;'>
-            Predicting Student Absenteeism<br>Before It Becomes a Crisis
-        </div>
-        <div style='font-size:0.95rem; color:#B8CFDF; margin-top:14px; max-width:640px; line-height:1.6;'>
+        <div style='font-size:0.97rem; color:#B8CFDF; line-height:1.7;'>
             Every year, thousands of CPS students slip into chronic absenteeism — missing so many days
             that they fall behind and never catch up. This tool uses 8 years of district records to flag
-            those students <b style='color:#FFFFFF;'>at the start of the school year</b>,
+            those students <b style='color:#FFFFFF;'>at the very start of the school year</b>,
             so counselors and family liaisons can step in before it is too late.
         </div>
     </div>
@@ -218,65 +207,76 @@ if page == "📊  District Overview":
     col_l, col_r = st.columns([1.05, 1], gap="large")
 
     with col_l:
-        st.markdown("<div class='section-header'>The Problem We Are Solving</div>", unsafe_allow_html=True)
-        st.markdown("<div class='section-sub'>What chronic absenteeism is, and why it matters</div>", unsafe_allow_html=True)
-
         st.markdown("""
-        <div class='insight-card'>
-            <div class='title'>📋 What counts as chronic absenteeism?</div>
-            <div class='body'>A student is considered chronically absent when they miss
-            <b>18 or more school days</b> in a year — that is just 2 days per month.
-            It sounds small, but the learning loss compounds quickly.</div>
+        <div style='font-size:1.25rem; font-weight:800; color:#003057; margin-bottom:4px;
+                    border-left:5px solid #C8973A; padding-left:14px;'>
+            The Problem We Are Solving
         </div>
-        <div class='insight-card' style='border-color:#DC2626;'>
-            <div class='title'>📉 What happens to these students?</div>
-            <div class='body'>Students who are chronically absent are <b>3× more likely</b>
-            to fall behind in reading by 3rd grade, and significantly more likely to drop out
-            before finishing high school.</div>
-        </div>
-        <div class='insight-card' style='border-color:#F59E0B;'>
-            <div class='title'>💰 What does it cost the district?</div>
-            <div class='body'>State funding is tied to how many students show up each day.
-            When attendance drops, so does funding. Getting even <b>one extra day</b> of
-            attendance per at-risk student adds up to hundreds of thousands of dollars
-            across a large district.</div>
-        </div>
-        <div class='insight-card' style='border-color:#22C55E;'>
-            <div class='title'>🎯 How does this tool help?</div>
-            <div class='body'>Instead of reacting after a student has already missed 30 days,
-            this tool gives counselors and family liaisons a <b>full school year</b> to reach
-            out, build relationships, and remove the barriers keeping students away.</div>
+        <div style='font-size:0.82rem; color:#4A6580; margin-bottom:18px; padding-left:19px;'>
+            What chronic absenteeism is, and why it matters for CPS
         </div>
         """, unsafe_allow_html=True)
 
+        problems = [
+            ("#4A90C4", "📋", "What counts as chronic absenteeism?",
+             "A student is considered chronically absent when they miss <b>18 or more school days</b> in a year — just 2 days per month. It sounds small, but the learning loss compounds quickly."),
+            ("#DC2626", "📉", "What happens to these students?",
+             "Chronically absent students are <b>3× more likely</b> to fall behind in reading by 3rd grade and significantly more likely to drop out before finishing high school."),
+            ("#C8973A", "💰", "What does it cost the district?",
+             "State funding is tied to daily attendance. Getting even <b>one extra day</b> of attendance per at-risk student adds up to hundreds of thousands of dollars across the district."),
+            ("#16A34A", "🎯", "How does this tool help?",
+             "Instead of reacting after a student has missed 30 days, counselors get a priority list <b>on day one of the school year</b> — a full year to reach out, build relationships, and remove barriers."),
+        ]
+        for color, icon, title, body in problems:
+            st.markdown(f"""
+            <div style='background:#FFFFFF; border:1px solid #E2E8F0; border-left:5px solid {color};
+                        border-radius:0 10px 10px 0; padding:16px 18px; margin-bottom:12px;
+                        box-shadow:0 1px 4px rgba(0,48,87,0.06);'>
+                <div style='font-size:0.9rem; font-weight:700; color:#003057; margin-bottom:6px;'>
+                    {icon} {title}
+                </div>
+                <div style='font-size:0.82rem; color:#334D66; line-height:1.6;'>{body}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
     with col_r:
-        st.markdown("<div class='section-header'>From Data to Action — How It Works</div>", unsafe_allow_html=True)
-        st.markdown("<div class='section-sub'>Five steps from raw records to a counselor's priority list</div>", unsafe_allow_html=True)
+        st.markdown("""
+        <div style='font-size:1.25rem; font-weight:800; color:#003057; margin-bottom:4px;
+                    border-left:5px solid #C8973A; padding-left:14px;'>
+            From Data to Action — How It Works
+        </div>
+        <div style='font-size:0.82rem; color:#4A6580; margin-bottom:18px; padding-left:19px;'>
+            Five steps from raw records to a counselor's priority list
+        </div>
+        """, unsafe_allow_html=True)
 
         stages = [
-            ("1", "#3B82F6", "Collect the Data",
-             "8 years of attendance, health, demographics, and school history for every student in the district."),
-            ("2", "#8B5CF6", "Find the Patterns",
-             "The system learns from 30 signals — things like last year's attendance, whether a student moved schools, or has a health condition."),
-            ("3", "#EC4899", "Train the Model",
-             "Using the history of 529,000 students, the model learns which combinations of factors lead to chronic absenteeism."),
-            ("4", "#F59E0B", "Score Every Student",
-             "Before the new school year starts, every student receives a risk score from 0–100%."),
-            ("5", "#22C55E", "Targeted Outreach",
-             "Counselors get a prioritized list. High-risk students get a phone call in week one — not a letter in March."),
+            ("#003057", "#4A90C4", "1", "Collect the Data",
+             "8 years of CPS attendance, health, demographics, and school history — one record per student per year."),
+            ("#003057", "#8B5CF6", "2", "Find the Patterns",
+             "The system learns from 30 signals: last year's attendance, school transfers, health conditions, housing stability, and more."),
+            ("#003057", "#C8973A", "3", "Build the Model",
+             "Trained on 529,000 students across 8 years, the model learns which combinations reliably predict chronic absenteeism."),
+            ("#003057", "#DC2626", "4", "Score Every Student",
+             "Before the new school year begins, every enrolled CPS student receives a risk score from 0–100%."),
+            ("#003057", "#16A34A", "5", "Targeted Outreach",
+             "Counselors receive a ranked list. The highest-risk students get a phone call in week one — not a letter in March."),
         ]
-        for num, color, title, desc in stages:
+        for bg, color, num, title, desc in stages:
             st.markdown(f"""
-            <div style='display:flex; align-items:flex-start; margin-bottom:14px; gap:12px;'>
-                <div style='min-width:32px; height:32px; background:{color}; border-radius:50%;
+            <div style='display:flex; align-items:flex-start; margin-bottom:14px; gap:14px;
+                        background:#FFFFFF; border:1px solid #E2E8F0; border-radius:10px;
+                        padding:14px 16px; box-shadow:0 1px 4px rgba(0,48,87,0.06);'>
+                <div style='min-width:36px; height:36px; background:{color}; border-radius:50%;
                             display:flex; align-items:center; justify-content:center;
-                            font-weight:700; font-size:0.85rem; color:white; margin-top:2px;'>{num}</div>
+                            font-weight:800; font-size:1rem; color:white; flex-shrink:0;'>{num}</div>
                 <div>
-                    <div style='font-weight:600; font-size:0.88rem; color:#1E293B;'>{title}</div>
-                    <div style='font-size:0.78rem; color:#64748B; margin-top:2px;'>{desc}</div>
+                    <div style='font-weight:700; font-size:0.92rem; color:#003057; margin-bottom:4px;'>{title}</div>
+                    <div style='font-size:0.8rem; color:#4A6580; line-height:1.5;'>{desc}</div>
                 </div>
             </div>
             """, unsafe_allow_html=True)
+
 
     st.markdown("<hr class='thin'/>", unsafe_allow_html=True)
 
