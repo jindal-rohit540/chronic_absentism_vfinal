@@ -23,6 +23,14 @@ html, body, [class*="css"], * {
     font-family: Aptos, 'Nunito Sans', 'Segoe UI', Arial, sans-serif !important;
 }
 
+/* ── Remove default top padding / header space ── */
+.block-container { padding-top: 1rem !important; }
+#MainMenu, header, footer { visibility: hidden; }
+
+/* ── Hide sidebar collapse arrow label ── */
+[data-testid="collapsedControl"] { display: none; }
+button[kind="header"] { display: none !important; }
+
 /* ── Sidebar — CPS Navy ── */
 [data-testid="stSidebar"] {
     background: linear-gradient(180deg, #003057 0%, #00213d 100%);
@@ -134,20 +142,18 @@ div[data-testid="stNumberInput"] > div { border-radius: 6px !important; }
 
 # ── Navigation ────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("<div style='padding:16px 20px 0 20px;'>", unsafe_allow_html=True)
-    st.image("Built-in/cps_logo.jpg", width=180)
+    st.markdown("""
+    <div style='padding:12px 16px 0 16px; text-align:center;'>
+    """, unsafe_allow_html=True)
+    st.image("Built-in/cps_logo.jpg", width=160)
     st.markdown("""
     </div>
-    <div style='text-align:center; padding:4px 16px 14px 16px;'>
-        <div style='font-size:0.62rem; font-weight:700; letter-spacing:0.12em;
-                    color:#C8973A; text-transform:uppercase; margin-bottom:3px;'>
-            Enterprise Analytics &amp; Architecture
-        </div>
-        <div style='font-size:0.88rem; font-weight:800; color:#FFFFFF; line-height:1.3;'>
+    <div style='text-align:center; padding:6px 14px 16px 14px;'>
+        <div style='font-size:1.05rem; font-weight:800; color:#FFFFFF; line-height:1.35;'>
             Chronic Absenteeism<br>Early Warning System
         </div>
     </div>
-    <hr style='border-color:#C8973A; margin:4px 0 18px 0; opacity:0.4;'/>
+    <hr style='border-color:#C8973A; margin:0 0 14px 0; opacity:0.4;'/>
     """, unsafe_allow_html=True)
 
     page = st.radio(
@@ -298,17 +304,13 @@ if page == "📊  District Overview":
             "Dental health not up to date",
             "Has asthma",
             "Was frequently late last year",
-            "Changed schools this year",
-            "Receives free or reduced lunch",
-            "Vision screening overdue",
         ],
         "Impact": [0.380, 0.175, 0.068, 0.052, 0.048, 0.042, 0.038, 0.033,
-                   0.028, 0.025, 0.022, 0.020, 0.018, 0.015, 0.006],
+                   0.028, 0.025, 0.022, 0.020],
         "Category": [
             "Attendance History", "Attendance History", "Attendance History", "Age & Grade",
             "Economic Hardship", "Economic Hardship", "Student Mobility", "Student Health",
             "Special Services", "Student Health", "Student Health", "Attendance History",
-            "Student Mobility", "Economic Hardship", "Student Health",
         ],
     }).sort_values("Impact", ascending=True)
 
