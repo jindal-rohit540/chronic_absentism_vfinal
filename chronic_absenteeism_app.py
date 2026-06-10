@@ -615,6 +615,22 @@ elif page == "🔍  Check a Student's Risk":
             grade = GRADE_OPTIONS[grade_label]
         language = "English"  # removed from UI; default passed to model
 
+        NETWORK_OPTIONS = [
+            "Not Specified",
+            "Network 1",  "Network 2",  "Network 3",  "Network 4",
+            "Network 5",  "Network 6",  "Network 7",  "Network 8",
+            "Network 9",  "Network 10", "Network 11", "Network 12",
+            "Network 13", "Network 14", "Network 15", "Network 16",
+            "Charter", "Options", "Contract", "ISP", "ALOP", "SAFE",
+        ]
+        sn_col1, sn_col2 = st.columns([1, 1])
+        with sn_col1:
+            student_network = st.selectbox(
+                "School Network",
+                NETWORK_OPTIONS,
+                help="The CPS network this student's school belongs to.",
+            )
+
         st.markdown("<hr class='thin'/>", unsafe_allow_html=True)
 
         # Attendance History
@@ -677,19 +693,15 @@ elif page == "🔍  Check a Student's Risk":
 
         # Student Health
         st.markdown("<div class='section-header'>Student Health</div>", unsafe_allow_html=True)
-        h1, h2, h3 = st.columns(3)
-        with h1:
+        sh1, sh2 = st.columns(2)
+        with sh1:
             chronic_count = st.number_input("# Chronic Medical Conditions",
                 min_value=0, max_value=10, value=0, step=1,
                 help="Number of documented chronic health conditions (e.g. asthma, diabetes).")
-        with h2:
-            dental_ok = st.selectbox("Dental Screening Up to Date", ["Yes", "No"],
-                help="Unmet dental needs are a documented driver of missed school days.")
-        with h3:
-            vision_ok = st.selectbox("Vision Screening Up to Date", ["Yes", "No"],
-                help="Undiagnosed vision problems can cause disengagement and absences.")
-
-        immun_ok     = st.selectbox("Immunizations Up to Date", ["Yes", "No"], index=0)
+        with sh2:
+            immun_ok = st.selectbox("Immunizations Up to Date", ["Yes", "No"], index=0)
+        dental_ok = "Yes"   # removed from UI — held at neutral default
+        vision_ok = "Yes"   # removed from UI — held at neutral default
 
         st.markdown("<br/>", unsafe_allow_html=True)
         predict_btn = st.button(
@@ -879,10 +891,16 @@ elif page == "🔍  Check a Student's Risk":
 # ══════════════════════════════════════════════════════════════════════════════
 elif page == "🏫  School & Network View":
 
-    # ── Load predictions CSV ───────────────────────────────────────────────────
+    # ── Load predictions CSV + join NETWORK from dim_schools ─────────────────
     @st.cache_data
     def load_predictions():
-        return pd.read_csv("Built-in/predictions_by_network.csv")
+        pred = pd.read_csv("Built-in/predictions_by_network.csv")
+        dim  = pd.read_csv("Built-in/dim_schools.csv")[["SCHOOL_NAME", "NETWORK"]]
+        # Drop duplicate school entries before merging to avoid row explosion
+        dim  = dim.drop_duplicates(subset="SCHOOL_NAME")
+        pred = pred.merge(dim, on="SCHOOL_NAME", how="left")
+        pred["NETWORK"] = pred["NETWORK"].fillna(pred["GOVERNANCE"])
+        return pred
 
     PRED_FILE = "Built-in/predictions_by_network.csv"
 
@@ -928,7 +946,15 @@ elif page == "🏫  School & Network View":
     st.markdown("<div class='section-header'>Step 1 — Choose a Network</div>", unsafe_allow_html=True)
     st.markdown("<div class='section-sub'>Select the network you want to review. All schools in that network will appear below.</div>", unsafe_allow_html=True)
 
-    available_networks = ["Entire District (All CPS)"] + sorted(df_pred["GOVERNANCE"].dropna().unique().tolist())
+    # Build ordered network list: All CPS first, then Network 1–16 sorted numerically,
+    # then other governance types (Charter, ALOP, etc.) sorted alphabetically.
+    _all_networks = df_pred["NETWORK"].dropna().unique().tolist()
+    _numbered = sorted(
+        [n for n in _all_networks if n.startswith("Network ")],
+        key=lambda x: int(x.split(" ")[1])
+    )
+    _other = sorted([n for n in _all_networks if not n.startswith("Network ")])
+    available_networks = ["Entire District (All CPS)"] + _numbered + _other
 
     nc1, nc2 = st.columns([1.5, 2.5])
     with nc1:
@@ -937,7 +963,7 @@ elif page == "🏫  School & Network View":
     if selected_network == "Entire District (All CPS)":
         network_df = df_pred.copy()
     else:
-        network_df = df_pred[df_pred["GOVERNANCE"] == selected_network]
+        network_df = df_pred[df_pred["NETWORK"] == selected_network]
 
     # ── Step 2: Optionally drill into one school ───────────────────────────────
     st.markdown("<div class='section-header' style='margin-top:18px;'>Step 2 — Drill Into a School (Optional)</div>", unsafe_allow_html=True)
